@@ -18,7 +18,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. PENGATURAN DATA ---
-FILE_PATH = r'C:\Elkana\python\Project xx\PASUT_NAVIGASI_APRIL_2026.xlsx'
+FILE_NAME = 'PASUT_NAVIGASI_APRIL_2026.xlsx'
 BATAS_ROB = 1.2
 
 @st.cache_data

@@ -17,8 +17,21 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. PENGATURAN DATA ---
-FILE_NAME = 'PASUT_NAVIGASI_APRIL_2026.xlsx'
+# --- 2. PENGATURAN DATA (VERSI AUTO-DETECT) ---
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Cari file excel secara otomatis di folder utama
+files_in_dir = os.listdir(BASE_DIR)
+excel_files = [f for f in files_in_dir if f.endswith('.xlsx')]
+
+if excel_files:
+    FILE_NAME = excel_files[0] # Ambil file excel pertama yang ketemu
+    FILE_PATH = os.path.join(BASE_DIR, FILE_NAME)
+else:
+    FILE_PATH = None
+
 BATAS_ROB = 1.2
 
 @st.cache_data

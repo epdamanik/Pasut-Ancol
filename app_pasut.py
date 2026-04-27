@@ -35,7 +35,7 @@ def load_data(path):
     if not path: return None, None, None
     try:
         df = pd.read_excel(path)
-        tgl_col, val_col = 'Waktu_WIB', 'Tinggi_Navigasi_m'
+        tgl_col, val_col = 'tanggal_prediksi', 'wl_prediksi'
         df[tgl_col] = pd.to_datetime(df[tgl_col])
         df = df.sort_values(tgl_col)
         return df, tgl_col, val_col

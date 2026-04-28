@@ -6,55 +6,54 @@ from streamlit_autorefresh import st_autorefresh
 import os
 import time
 
-# --- 0. SMART AUTO REFRESH (15 Menit) ---
+# --- 0. SMART AUTO REFRESH (Sinkron per 15 Menit) ---
 now_sync = datetime.now()
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
-st_autorefresh(interval=max(seconds_to_next, 1) * 1000, key="datarefresh")
+st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 
-# --- 1. KONFIGURASI HALAMAN ---
+# --- 1. KONFIGURASI HALAMAN & CSS ---
 st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_icon="🌊")
-
-NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f8f9fa; }
-    [data-testid="stMetricValue"] { font-size: 22px; font-weight: bold; }
-    .stMetric { background-color: #ffffff; padding: 10px; border-radius: 10px; border: 1px solid #eee; }
+    .stApp { background-color: #ffffff; }
+    [data-testid="stMetricValue"] { font-size: 26px; font-weight: 800; color: #000; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 12px; border: 2px solid #e0e0e0; }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. SIDEBAR (KHUSUS FILTER) ---
+# --- 2. SIDEBAR ---
 with st.sidebar:
     st.subheader("🗓️ Filter Waktu")
     sekarang = datetime.now()
-    if os.name != 'nt': 
-        sekarang = sekarang + timedelta(hours=7)
+    # Penyesuaian timezone jika dideploy di server Linux/Cloud
+    if os.name != 'nt': sekarang = sekarang + timedelta(hours=7)
 
     tgl_range = st.date_input(
         "Rentang Grafik", 
         value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2))
     )
     st.divider()
-    st.caption("Atur tanggal untuk melihat history dan prediksi.")
+    st.info("💡 Garis **Hijau** tegak lurus menunjukkan waktu saat ini.")
 
-# --- 3. HEADER UTAMA (Centered & Compact 75%) ---
+# --- 3. HEADER UTAMA ---
 h1, h2, h3, h4, h5 = st.columns([2, 1, 0.7, 1, 2])
+NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
+
 with h3:
     if os.path.exists(NAMA_FILE_LOGO):
         st.image(NAMA_FILE_LOGO, use_container_width=True)
-    else:
-        st.write("⚓")
 
 st.markdown(f"""
     <div style="text-align: center; margin-top: -15px;">
-        <h2 style="margin-bottom: 0px; font-size: 1.8rem; color: #0E1117; letter-spacing: 1px;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
-        <p style="color: #1f77b4; font-weight: 500; font-size: 0.95rem; margin-top: 0px;">
+        <h2 style="margin-bottom: 0px; font-size: 1.8rem; color: #000000; font-weight: bold;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
+        <p style="color: #004085; font-weight: 700; font-size: 1rem; margin-top: 0px;">
             Monitoring Water Level AWS Maritim Tanjung Priok
         </p>
     </div>
     """, unsafe_allow_html=True)
+
 st.divider()
 
 # --- 4. DATA LOGIC (Scraping & Load) ---
@@ -70,11 +69,7 @@ FILE_HISTORY = 'history_aws_priok.csv'
 BATAS_ROB = 2.5
 
 def save_to_csv(waktu, nilai):
-    discard = timedelta(minutes=waktu.minute % 15, seconds=waktu.second, microseconds=waktu.microsecond)
-    waktu_bulat = waktu - discard
-    if discard >= timedelta(minutes=7, seconds=30):
-        waktu_bulat += timedelta(minutes=15)
-    waktu_str = waktu_bulat.strftime('%Y-%m-%d %H:%M')
+    waktu_str = waktu.strftime('%Y-%m-%d %H:%M')
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     if not os.path.exists(FILE_HISTORY):
         new_data.to_csv(FILE_HISTORY, index=False)
@@ -104,7 +99,7 @@ def fetch_aws_realtime():
         driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
         wait = WebDriverWait(driver, 20)
         element = wait.until(EC.visibility_of_element_located((By.ID, "waterlevel")))
-        time.sleep(3) 
+        time.sleep(2) 
         val = float(element.text.replace('m', '').replace(',', '.').strip())
         driver.quit()
         return val, datetime.now()
@@ -151,63 +146,60 @@ if df_pred is not None:
     m3.metric("Prediksi", f"{h_pred:.2f} m")
     m4.metric("Batas ROB", f"{BATAS_ROB} m")
 
-    t_start = datetime.combine(tgl_range[0], datetime.min.time())
-    t_end = datetime.combine(tgl_range[1], datetime.max.time())
-    df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
+    t_start_view = datetime.combine(tgl_range[0], datetime.min.time())
+    t_end_view = datetime.combine(tgl_range[1], datetime.max.time())
 
     fig = go.Figure()
+    df_plot = df_pred[(df_pred[col_tgl] >= t_start_view) & (df_pred[col_tgl] <= t_end_view)]
     
-    # 1. PLOT PREDIKSI (POLOS/MULUS)
-    fig.add_trace(go.Scatter(
-        x=df_plot[col_tgl], 
-        y=df_plot[col_val], 
-        mode='lines', 
-        name='Prediksi',
-        line=dict(color='rgba(0, 123, 255, 0.4)', width=2)
-    ))
+    # Trace Prediksi - Warna Biru lebih tegas (0.6)
+    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], mode='lines', line=dict(color='rgba(0, 102, 204, 0.6)', width=2), name='Prediksi'))
 
-    # 2. PLOT AKTUAL (DENGAN DOT MERAH JALUR KERAS)
+    # Trace Aktual - Merah Tebal
     if not df_hist.empty:
-        hist_view = df_hist[(df_hist['waktu'] >= t_start) & (df_hist['waktu'] <= t_end)]
-        if not hist_view.empty:
-            fig.add_trace(go.Scatter(
-                x=hist_view['waktu'], 
-                y=hist_view['nilai'], 
-                mode='lines+markers', 
-                name='Aktual (Realtime)',
-                marker=dict(
-                    size=10, 
-                    color='red', 
-                    symbol='circle', 
-                    opacity=1,
-                    line=dict(width=1.5, color='white')
-                ),
-                line=dict(color='red', width=2.5),
-                connectgaps=True
-            ))
+        hist_view = df_hist[(df_hist['waktu'] >= t_start_view) & (df_hist['waktu'] <= t_end_view)]
+        fig.add_trace(go.Scatter(x=hist_view['waktu'], y=hist_view['nilai'], mode='lines', line=dict(color='#cc0000', width=3), name='Aktual'))
 
-    fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="orange", annotation_text="WASPADA ROB")
+    # Garis ROB
+    fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="#ff8c00", annotation_text="WASPADA ROB", annotation_font_color="#ff8c00")
     
-    fig.update_layout(
-        height=550, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified",
-        xaxis=dict(type='date', title="Waktu (WIB)"), yaxis=dict(title='Meter (m)')
+    # GARIS SEKARANG (Vertical)
+    fig.add_vline(x=sekarang, line_dash="dot", line_width=2, line_color="#008000")
+    
+    # LABEL SEKARANG (Fixed Propery)
+    fig.add_annotation(
+        x=sekarang, y=1.05, yref="paper",
+        text=f"SAAT INI ({sekarang.strftime('%H:%M')})",
+        showarrow=False,
+        font=dict(color="#008000", size=12, weight="bold"),
+        bgcolor="#ffffff", bordercolor="#008000", borderwidth=1,
+        xanchor="left"
     )
-    
-    # Paksa semua markers di line Aktual untuk selalu muncul (Anti-Hidden)
-    fig.update_traces(marker=dict(opacity=1), selector=dict(name='Aktual (Realtime)'))
-    
+
+    # FIX UPDATE LAYOUT (Struktur Title Baru)
+    fig.update_layout(
+        height=550, template="plotly_white", 
+        margin=dict(l=10, r=10, t=70, b=10), 
+        hovermode="x unified",
+        xaxis=dict(
+            type='date', 
+            title=dict(text="Waktu (WIB)", font=dict(color='black', size=13, weight="bold")),
+            tickfont=dict(color='black', size=11)
+        ),
+        yaxis=dict(
+            title=dict(text='Tinggi Air (m)', font=dict(color='black', size=13, weight="bold")),
+            tickfont=dict(color='black', size=11)
+        )
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     # --- 6. FOOTER ---
     st.divider()
-    c1, c2, c3 = st.columns([2, 1, 1])
-    with c1: st.success(f"✅ ONLINE | Update: {sekarang.strftime('%H:%M:%S')} WIB")
-    with c2:
-        if os.path.exists(FILE_HISTORY):
-            with open(FILE_HISTORY, "rb") as f: st.download_button("📥 Export CSV", f, "history_priok.csv", "text/csv")
-    with c3:
-        if st.button("🔄 Refresh"): st.cache_data.clear(); st.rerun()
+    c1, c2 = st.columns([3, 1])
+    with c1: st.success(f"✅ SISTEM ONLINE | Update: {sekarang.strftime('%H:%M:%S')} WIB")
+    with c2: 
+        if st.button("🔄 Force Refresh"): st.cache_data.clear(); st.rerun()
 
-    st.markdown(f"""<div style="text-align: center; color: #bbb; font-size: 10px; margin-top: 20px;">© 2026 BMKG Maritim Tanjung Priok</div>""", unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align: center; color: #333; font-size: 11px; font-weight: bold; margin-top: 20px;">© 2026 BMKG Maritim Tanjung Priok</div>', unsafe_allow_html=True)
 else:
     st.error("❌ File Prediksi Excel tidak ditemukan!")

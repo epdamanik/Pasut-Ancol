@@ -27,7 +27,7 @@ st.markdown("""
 
 # --- 2. PENGATURAN DATA & LOAD ---
 FILE_NAME = 'PASUT_NAVIGASI_APRIL_2026.xlsx'
-BATAS_ROB = 1.2
+BATAS_ROB = 2.5
 
 @st.cache_data(ttl=600)
 def load_data(filename):

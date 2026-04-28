@@ -142,7 +142,7 @@ if df_pred is not None:
         
         st.markdown(f"""
             <div class="signal-box">
-                <span style="font-weight: bold; color: #004085; font-size: 1.1rem;">🎯 Ringkasan Kondisi Hari Ini (Prediksi):</span><br>
+                <span style="font-weight: bold; color: #000000; font-size: 1.1rem;">🎯 Ringkasan Kondisi Hari Ini (Prediksi):</span><br>
                 🚀 <b>Puncak Pasang:</b> {waktu_max.strftime('%H:%M')} WIB (<span style="color:red">{val_max:.2f} m</span>) | 
                 ⚓ <b>Surut Terendah:</b> {waktu_min.strftime('%H:%M')} WIB (<span style="color:green">{val_min:.2f} m</span>)
             </div>

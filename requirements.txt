@@ -3,3 +3,5 @@ pandas
 plotly
 openpyxl
 streamlit-autorefresh
+selenium
+webdriver-manager

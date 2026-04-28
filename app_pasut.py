@@ -140,11 +140,22 @@ if df_pred is not None:
         waktu_min = df_hari_ini.loc[idx_min, col_tgl]
         val_min = df_hari_ini.loc[idx_min, col_val]
         
+        tgl_skrg = sekarang.strftime('%d %b %Y')
+        
         st.markdown(f"""
-            <div class="signal-box">
-                <span style="font-weight: bold; color: #000000; font-size: 1.1rem;">🎯 Ringkasan Kondisi Hari Ini (Prediksi):</span><br>
-                🚀 <b>Puncak Pasang:</b> {waktu_max.strftime('%H:%M')} WIB (<span style="color:red">{val_max:.2f} m</span>) | 
-                ⚓ <b>Surut Terendah:</b> {waktu_min.strftime('%H:%M')} WIB (<span style="color:green">{val_min:.2f} m</span>)
+            <div style="
+                background-color: #ffffde; 
+                padding: 15px; 
+                border-radius: 10px; 
+                margin-bottom: 20px; 
+                border: 2px solid #000000;
+                color: #000000;
+            ">
+                <span style="font-weight: 800; font-size: 1.2rem;">📝 Ringkasan Kondisi ({tgl_skrg})</span><br>
+                <div style="margin-top: 8px; font-size: 1.1rem; line-height: 1.6;">
+                    🚀 <b>Pasang Tertinggi:</b> <span style="color: #d00000; font-weight: 800;">{waktu_max.strftime('%H:%M')} WIB ({val_max:.2f} m)</span><br>
+                    📉 <b>Surut Terendah:</b> <span style="color: #008000; font-weight: 800;">{waktu_min.strftime('%H:%M')} WIB ({val_min:.2f} m)</span>
+                </div>
             </div>
         """, unsafe_allow_html=True)
 

@@ -9,7 +9,7 @@ import os
 st_autorefresh(interval=5 * 60 * 1000, key="datarefresh")
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Navigasi Pasut Online", layout="wide")
+st.set_page_config(page_title="Pasut ANCOL", layout="wide")
 
 st.markdown("""
     <style>

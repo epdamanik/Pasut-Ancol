@@ -18,7 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 st_autorefresh(interval=15 * 60 * 1000, key="datarefresh")
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Pasut Tg. Priok Real-time", layout="wide", page_icon="🌊")
+st.set_page_config(page_title="Monitoring Pasut AWS Tg. Priok Real-time", layout="wide", page_icon="🌊")
 
 # CSS Custom
 st.markdown("""

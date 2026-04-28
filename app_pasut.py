@@ -129,7 +129,7 @@ if df_pred is not None:
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Tinggi Air Aktual", f"{val_tampil:.2f} m", delta=f"{val_tampil - h_pred:.2f} m" if aws_val else None, delta_color="inverse")
     m2.metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
-    m3.metric("Prediksi Jam Ini", f"{h_pred:.2f} m")
+    m3.metric("Prediksi", f"{h_pred:.2f} m")
     m4.metric("Batas ROB", f"{BATAS_ROB} m")
 
     # --- 7. GRAFIK (DENGAN DOUBLE MARKER) ---

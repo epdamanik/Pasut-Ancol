@@ -195,7 +195,7 @@ if df_pred is not None:
     st.divider()
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1: 
-        st.success(f"✅ Sistem Berjalan Normal | Update Terakhir: {sekarang.strftime('%H:%M:%S')} WIB")
+        st.success(f"✅ Stasiun Meteorologi Maritim Tanjung Priok | Update Terakhir: {sekarang.strftime('%H:%M:%S')} WIB")
     with c2:
         if os.path.exists(FILE_HISTORY):
             with open(FILE_HISTORY, "rb") as f: st.download_button("📥 Export CSV", f, "history_priok.csv", "text/csv")

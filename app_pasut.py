@@ -18,9 +18,9 @@ from selenium.webdriver.support import expected_conditions as EC
 st_autorefresh(interval=15 * 60 * 1000, key="datarefresh")
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Pasut Ancol Real-time", layout="wide", page_icon="🌊")
+st.set_page_config(page_title="Pasut Tg. Priok Real-time", layout="wide", page_icon="🌊")
 
-# CSS Custom biar tampilan kayak Dashboard Pro
+# CSS Custom
 st.markdown("""
     <style>
     .stApp { background-color: #f8f9fa; }
@@ -34,12 +34,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Nama file
+# --- 2. PENGATURAN FILE ---
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
-FILE_HISTORY = 'history_aws_ancol.csv'
+FILE_HISTORY = 'history_aws_priok.csv' 
 BATAS_ROB = 2.5
 
-# --- 2. FUNGSI PERMANEN (CSV) ---
 def save_to_csv(waktu, nilai):
     new_data = pd.DataFrame({'waktu': [waktu], 'nilai': [nilai]})
     if not os.path.exists(FILE_HISTORY):
@@ -47,13 +46,12 @@ def save_to_csv(waktu, nilai):
     else:
         try:
             old_data = pd.read_csv(FILE_HISTORY)
-            # Gabung dan hapus duplikat biar gak numpuk di menit yang sama
             combined = pd.concat([old_data, new_data]).drop_duplicates(subset=['waktu'])
             combined.to_csv(FILE_HISTORY, index=False)
         except:
             new_data.to_csv(FILE_HISTORY, index=False)
 
-# --- 3. FUNGSI SCRAPING (HYBRID: WINDOWS & LINUX OK) ---
+# --- 3. FUNGSI SCRAPING (Target: Tg. Priok) ---
 @st.cache_data(ttl=850)
 def fetch_aws_realtime():
     options = Options()
@@ -64,26 +62,25 @@ def fetch_aws_realtime():
     
     driver = None
     try:
-        # Deteksi OS
-        if os.name == 'nt':  # Local Windows (VS Code)
+        if os.name == 'nt':  # Windows
             from webdriver_manager.chrome import ChromeDriverManager
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=options)
-        else:  # Streamlit Cloud (Linux)
+        else:  # Linux (Streamlit Cloud)
             options.binary_location = "/usr/bin/chromium"
             service = Service("/usr/bin/chromedriver")
             driver = webdriver.Chrome(service=service, options=options)
         
-        driver.get("http://202.90.199.132/aws-new/monitoring/3000000018")
+        # URL UPDATE KE TANJUNG PRIOK
+        driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
         
-        # Tunggu element target muncul di web BMKG
         wait = WebDriverWait(driver, 25)
+        # Tetap gunakan ID 'waterlevel' karena ini standar di dashboard AWS BMKG
         element = wait.until(EC.visibility_of_element_located((By.ID, "waterlevel")))
         
-        time.sleep(3) # Jeda tambahan biar angka beneran ke-load
+        time.sleep(3) 
         val_text = element.text.strip()
         
-        # Bersihkan teks (buang 'm', handle koma jadi titik)
         val_clean = val_text.replace('m', '').replace(',', '.').strip()
         val = float(val_clean)
         
@@ -106,65 +103,54 @@ def load_prediction():
         df[tgl_col] = pd.to_datetime(df[tgl_col])
     return df.sort_values(tgl_col) if tgl_col else None, tgl_col, val_col
 
-# --- EKSEKUSI DATA ---
+# --- EKSEKUSI ---
 df_pred, col_tgl, col_val = load_prediction()
 aws_val, aws_time = fetch_aws_realtime()
 
-# Simpan ke CSV jika scrap berhasil
 if aws_val is not None:
     save_to_csv(aws_time.strftime('%Y-%m-%d %H:%M'), aws_val)
 
 # --- 5. TAMPILAN DASHBOARD ---
-st.title("⚓ Monitoring Pasut Ancol (15-Min Real-time)")
+st.title("⚓ Monitoring Pasut Tg. Priok (Real-time)")
 
 if df_pred is not None:
-    # Penyesuaian waktu (Gunakan WIB)
     sekarang = datetime.now()
-    # Jika di Cloud (Server UTC), tambahkan 7 jam untuk WIB
     if os.name != 'nt':
         sekarang = sekarang + timedelta(hours=7)
 
-    # Baca History CSV
     df_hist = pd.read_csv(FILE_HISTORY) if os.path.exists(FILE_HISTORY) else pd.DataFrame()
     if not df_hist.empty:
         df_hist['waktu'] = pd.to_datetime(df_hist['waktu'])
 
-    # Hitung Prediksi saat ini
     idx_now = (df_pred[col_tgl] - sekarang).abs().idxmin()
     h_pred = df_pred.loc[idx_now, col_val]
     
-    # Nilai Tampilan (Prioritas AWS -> History Terakhir -> Prediksi)
     val_tampil = aws_val if aws_val else (df_hist['nilai'].iloc[-1] if not df_hist.empty else h_pred)
     
-    # Layout Metrik
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Tinggi Air (AWS)", f"{val_tampil:.2f} m", 
               delta=f"{val_tampil - h_pred:.2f} m" if aws_val else None, delta_color="inverse")
     m2.metric("Status", "PASANG" if val_tampil >= df_pred[col_val].mean() else "SURUT")
-    m3.metric("Prediksi Model", f"{h_pred:.2f} m")
+    m3.metric("Prediksi (Ancol)", f"{h_pred:.2f} m")
     m4.metric("Batas ROB", f"{BATAS_ROB} m")
 
     # --- 6. GRAFIK GABUNGAN ---
     fig = go.Figure()
 
-    # A. Garis Prediksi (Garis Biru Tipis/Putus-putus)
     t_start = sekarang - timedelta(hours=12)
     t_end = sekarang + timedelta(hours=12)
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], mode='lines+markers',
                              line=dict(color='rgba(0, 123, 255, 0.2)', dash='dot'),
-                             marker=dict(size=3, color='#007bff'), name='Garis Prediksi'))
+                             marker=dict(size=3, color='#007bff'), name='Prediksi Astronomis'))
 
-    # B. Jejak AWS (Garis Merah Solid dari CSV)
     if not df_hist.empty:
-        # Ambil history 24 jam terakhir saja biar grafik tetap enteng
         hist_view = df_hist[df_hist['waktu'] >= (sekarang - timedelta(hours=24))]
         fig.add_trace(go.Scatter(x=hist_view['waktu'], y=hist_view['nilai'],
                                  mode='lines+markers', line=dict(color='red', width=2),
-                                 marker=dict(size=5, color='red'), name='Data Aktual (AWS)'))
+                                 marker=dict(size=5, color='red'), name='Data Aktual (AWS Priok)'))
 
-    # C. Titik Diamond Sekarang
     fig.add_trace(go.Scatter(x=[sekarang], y=[val_tampil], mode='markers+text',
                              marker=dict(color='red', size=15, symbol='diamond', line=dict(width=2, color='white')),
                              text=[f"<b>SAAT INI: {val_tampil}m</b>"], textposition="top center",
@@ -178,13 +164,6 @@ if df_pred is not None:
     
     st.plotly_chart(fig, use_container_width=True)
 
-    # Footer Status
-    c1, c2 = st.columns(2)
-    with c1:
-        st.success(f"✅ Auto-update tiap 15 Menit. Terakhir: {sekarang.strftime('%H:%M:%S')} WIB")
-    with c2:
-        if not aws_val:
-            st.warning("⚠️ Menggunakan data history/prediksi (AWS sedang offline).")
-
+    st.success(f"✅ Lokasi: Tg. Priok. Update tiap 15 Menit. Terakhir: {sekarang.strftime('%H:%M:%S')} WIB")
 else:
     st.error("❌ File Prediksi Excel tidak ditemukan!")

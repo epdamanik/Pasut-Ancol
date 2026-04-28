@@ -18,7 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 st_autorefresh(interval=15 * 60 * 1000, key="datarefresh")
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Monitoring Pasut AWS Tg. Priok Real-time", layout="wide", page_icon="🌊")
+st.set_page_config(page_title="Pasut Tg. Priok Real-time", layout="wide", page_icon="🌊")
 
 # CSS Custom
 st.markdown("""
@@ -36,6 +36,7 @@ st.markdown("""
 
 # --- 2. PENGATURAN FILE ---
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
+# Ganti nama file history agar data Tg. Priok tidak campur dengan data Kep. Seribu
 FILE_HISTORY = 'history_aws_priok.csv' 
 BATAS_ROB = 2.5
 
@@ -111,7 +112,7 @@ if aws_val is not None:
     save_to_csv(aws_time.strftime('%Y-%m-%d %H:%M'), aws_val)
 
 # --- 5. TAMPILAN DASHBOARD ---
-st.title("⚓ Monitoring Pasut Tg. Priok (Real-time)")
+st.title("⚓ Monitoring Pasut AWS Tg. Priok (Real-time)")
 
 if df_pred is not None:
     sekarang = datetime.now()
@@ -131,7 +132,7 @@ if df_pred is not None:
     m1.metric("Tinggi Air (AWS)", f"{val_tampil:.2f} m", 
               delta=f"{val_tampil - h_pred:.2f} m" if aws_val else None, delta_color="inverse")
     m2.metric("Status", "PASANG" if val_tampil >= df_pred[col_val].mean() else "SURUT")
-    m3.metric("Prediksi (Ancol)", f"{h_pred:.2f} m")
+    m3.metric("Prediksi Pasut", f"{h_pred:.2f} m")
     m4.metric("Batas ROB", f"{BATAS_ROB} m")
 
     # --- 6. GRAFIK GABUNGAN ---

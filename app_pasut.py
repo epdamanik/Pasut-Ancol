@@ -19,7 +19,6 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     [data-testid="stMetricValue"] { font-size: 26px; font-weight: 800; color: #000; }
     .stMetric { background-color: #ffffff; padding: 15px; border-radius: 12px; border: 2px solid #e0e0e0; }
-    .signal-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #004085; }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -56,7 +55,7 @@ st.markdown(f"""
 
 st.divider()
 
-# --- 4. DATA LOGIC (Scraping & Load) ---
+# --- 4. DATA LOGIC ---
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -128,37 +127,42 @@ if aws_val is not None:
 
 # --- 5. METRICS & GRAFIK ---
 if df_pred is not None:
-    # --- LOGIC HIGH/LOW HARIAN (Resistance & Support) ---
+    # --- LOGIC RINGKASAN HARIAN ---
     df_hari_ini = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     
     if not df_hari_ini.empty:
         idx_max = df_hari_ini[col_val].idxmax()
-        waktu_max = df_hari_ini.loc[idx_max, col_tgl]
-        val_max = df_hari_ini.loc[idx_max, col_val]
+        w_max = df_hari_ini.loc[idx_max, col_tgl].strftime('%H:%M')
+        v_max = f"{df_hari_ini.loc[idx_max, col_val]:.2f}"
         
         idx_min = df_hari_ini[col_val].idxmin()
-        waktu_min = df_hari_ini.loc[idx_min, col_tgl]
-        val_min = df_hari_ini.loc[idx_min, col_val]
+        w_min = df_hari_ini.loc[idx_min, col_tgl].strftime('%H:%M')
+        v_min = f"{df_hari_ini.loc[idx_min, col_val]:.2f}"
         
-        tgl_skrg = sekarang.strftime('%d %b %Y')
-        
-        st.markdown(f"""
-            <div style="
-                background-color: #ffffde; 
-                padding: 15px; 
-                border-radius: 10px; 
-                margin-bottom: 20px; 
-                border: 2px solid #000000;
-                color: #000000;
-            ">
-                <span style="font-weight: 800; font-size: 1.2rem;">📝 Ringkasan Kondisi ({tgl_skrg})</span><br>
-                <div style="margin-top: 8px; font-size: 1.1rem; line-height: 1.6;">
-                    🚀 <b>Pasang Tertinggi:</b> <span style="color: #d00000; font-weight: 800;">{waktu_max.strftime('%H:%M')} WIB ({val_max:.2f} m)</span><br>
-                    📉 <b>Surut Terendah:</b> <span style="color: #008000; font-weight: 800;">{waktu_min.strftime('%H:%M')} WIB ({val_min:.2f} m)</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        tgl_str = sekarang.strftime('%d %b %Y')
 
+        html_box = f"""
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e9ecef; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); color: #000000;">
+            <div style="font-weight: 700; font-size: 1.1rem; color: #004085; margin-bottom: 10px; border-bottom: 1px solid #dee2e6; padding-bottom: 8px;">
+                📝 Ringkasan Kondisi ({tgl_str})
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 1.05rem; color: #000000;">
+                <tr style="height: 30px;">
+                    <td style="width: 145px; white-space: nowrap;">🚀 <b>Pasang Tertinggi</b></td>
+                    <td style="width: 10px; text-align: center;">:</td>
+                    <td style="color: #c00000; font-weight: 700; padding-left: 8px;">{w_max} WIB ({v_max} m)</td>
+                </tr>
+                <tr style="height: 30px;">
+                    <td style="white-space: nowrap;">📉 <b>Surut Terendah</b></td>
+                    <td style="text-align: center;">:</td>
+                    <td style="color: #007000; font-weight: 700; padding-left: 8px;">{w_min} WIB ({v_min} m)</td>
+                </tr>
+            </table>
+        </div>
+        """
+        st.markdown(html_box, unsafe_allow_html=True)
+
+    # Metrics
     idx_now = (df_pred[col_tgl] - sekarang).abs().idxmin()
     h_pred = df_pred.loc[idx_now, col_val]
     idx_nanti = (df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin()
@@ -176,59 +180,28 @@ if df_pred is not None:
     m3.metric("Prediksi", f"{h_pred:.2f} m")
     m4.metric("Batas ROB", f"{BATAS_ROB} m")
 
+    # Grafik
     t_start_view = datetime.combine(tgl_range[0], datetime.min.time())
     t_end_view = datetime.combine(tgl_range[1], datetime.max.time())
 
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start_view) & (df_pred[col_tgl] <= t_end_view)]
-    
-    # Trace Prediksi
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], mode='lines', line=dict(color='rgba(0, 102, 204, 0.6)', width=2), name='Prediksi'))
 
-    # Trace Aktual
     if not df_hist.empty:
         hist_view = df_hist[(df_hist['waktu'] >= t_start_view) & (df_hist['waktu'] <= t_end_view)]
         fig.add_trace(go.Scatter(x=hist_view['waktu'], y=hist_view['nilai'], mode='lines', line=dict(color='#cc0000', width=3), name='Aktual'))
 
-    # Marker Puncak & Lembah Harian di Grafik
     if not df_hari_ini.empty:
-        fig.add_trace(go.Scatter(
-            x=[waktu_max, waktu_min], 
-            y=[val_max, val_min],
-            mode='markers+text',
-            marker=dict(color=['#cc0000', '#004085'], size=12, symbol='diamond'),
-            text=['HIGH', 'LOW'],
-            textposition='top center',
-            name='Daily H/L'
-        ))
+        fig.add_trace(go.Scatter(x=[df_hari_ini.loc[idx_max, col_tgl], df_hari_ini.loc[idx_min, col_tgl]], 
+                                 y=[df_hari_ini.loc[idx_max, col_val], df_hari_ini.loc[idx_min, col_val]],
+                                 mode='markers+text', marker=dict(color=['#cc0000', '#004085'], size=12, symbol='diamond'),
+                                 text=['HIGH', 'LOW'], textposition='top center', name='Daily H/L'))
 
-    # Garis ROB & Sekarang
     fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="#ff8c00", annotation_text="WASPADA ROB")
     fig.add_vline(x=sekarang, line_dash="dot", line_width=2, line_color="#008000")
     
-    fig.add_annotation(
-        x=sekarang, y=1.05, yref="paper",
-        text=f"SAAT INI ({sekarang.strftime('%H:%M')})",
-        showarrow=False,
-        font=dict(color="#008000", size=12, weight="bold"),
-        bgcolor="#ffffff", bordercolor="#008000", borderwidth=1,
-        xanchor="left"
-    )
-
-    # Struktur Update Layout yang benar (Fix Titlefont Error)
-    fig.update_layout(
-        height=550, template="plotly_white", margin=dict(l=10, r=10, t=75, b=10), 
-        hovermode="x unified",
-        xaxis=dict(
-            type='date', 
-            title=dict(text="Waktu (WIB)", font=dict(color='black', size=13, weight="bold")),
-            tickfont=dict(color='black', size=11)
-        ),
-        yaxis=dict(
-            title=dict(text='Tinggi Air (m)', font=dict(color='black', size=13, weight="bold")),
-            tickfont=dict(color='black', size=11)
-        )
-    )
+    fig.update_layout(height=550, template="plotly_white", margin=dict(l=10, r=10, t=75, b=10), hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
     # --- 6. FOOTER ---

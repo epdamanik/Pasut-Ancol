@@ -28,7 +28,7 @@ st.markdown("""
 
 # --- 2. PENGATURAN DATA & LOAD ---
 # Nama file harus sesuai dengan yang lu upload ke GitHub
-FILE_NAME = 'prediksi_pasut_ancol_2026.xlsx'
+FILE_NAME = 'PASUT_NAVIGASI_APRIL_2026.xlsx'
 BATAS_ROB = 1.2
 
 @st.cache_data(ttl=600)

@@ -165,13 +165,17 @@ if df_pred is not None:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
 
     fig = go.Figure()
-    # Plot Prediksi
+    # Plot Prediksi (DIPAKSA MUNCUL TITIKNYA)
     fig.add_trace(go.Scatter(
         x=df_plot[col_tgl], 
         y=df_plot[col_val], 
-        mode='lines+markers', # Pakai lines+markers biar titiknya kelihatan
-        marker=dict(size=4),
-        line=dict(color='rgba(0, 123, 255, 0.5)', width=2), 
+        mode='lines+markers', # Ini kuncinya biar ada garis dan titik
+        marker=dict(
+            size=4,           # Ukuran titik
+            symbol='circle',  # Bentuk titik bulat
+            opacity=0.7       # Biar gak terlalu tajam
+        ),
+        line=dict(color='rgba(0, 123, 255, 0.4)', width=2), 
         name='Prediksi'
     ))
 

@@ -37,7 +37,7 @@ with st.sidebar:
         value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2))
     )
     st.divider()
-    st.caption("Atur tanggal untuk melihat history dan prediksi.")
+    st.caption("Gunakan filter untuk mengatur tampilan grafik.")
 
 # --- 3. HEADER UTAMA (Centered & Elegant) ---
 h1, h2, h3, h4, h5 = st.columns([2, 1, 0.7, 1, 2])
@@ -151,38 +151,37 @@ if df_pred is not None:
     m3.metric("Prediksi", f"{h_pred:.2f} m")
     m4.metric("Batas ROB", f"{BATAS_ROB} m")
 
-    # Filter data grafik
     t_start = datetime.combine(tgl_range[0], datetime.min.time())
     t_end = datetime.combine(tgl_range[1], datetime.max.time())
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
 
     fig = go.Figure()
     
-    # --- PLOT PREDIKSI (TITIK DIPAKSA MUNCUL) ---
+    # --- PLOT PREDIKSI (POLOS TANPA DOT) ---
     fig.add_trace(go.Scatter(
         x=df_plot[col_tgl], 
         y=df_plot[col_val], 
-        mode='lines+markers', 
+        mode='lines', # Hanya garis
         name='Prediksi',
-        marker=dict(
-            size=6, 
-            color='rgba(0, 123, 255, 0.8)', 
-            line=dict(width=1, color='white') # Outline putih biar titik makin kontras
-        ),
-        line=dict(color='rgba(0, 123, 255, 0.3)', width=2)
+        line=dict(color='rgba(0, 123, 255, 0.4)', width=2)
     ))
 
-    # --- PLOT AKTUAL ---
+    # --- PLOT AKTUAL (DENGAN DOT KOTAK) ---
     if not df_hist.empty:
         hist_view = df_hist[(df_hist['waktu'] >= t_start) & (df_hist['waktu'] <= t_end)]
         if not hist_view.empty:
             fig.add_trace(go.Scatter(
                 x=hist_view['waktu'], 
                 y=hist_view['nilai'], 
-                mode='lines+markers', 
-                marker=dict(size=7, color='red', symbol='square'),
-                line=dict(color='red', width=2.5), 
-                name='Aktual (AWS)'
+                mode='lines+markers', # Garis + Titik
+                name='Aktual (Realtime)',
+                marker=dict(
+                    size=7, 
+                    color='red', 
+                    symbol='square', # Kotak biar beda
+                    line=dict(width=1, color='white')
+                ),
+                line=dict(color='red', width=2.5)
             ))
 
     fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="orange", annotation_text="WASPADA ROB")
@@ -191,8 +190,6 @@ if df_pred is not None:
         height=550, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified",
         xaxis=dict(type='date', title="Waktu (WIB)"), yaxis=dict(title='Meter (m)')
     )
-    # Paksa semua markers muncul meskipun data banyak
-    fig.update_traces(marker=dict(opacity=1), selector=dict(mode='lines+markers'))
     
     st.plotly_chart(fig, use_container_width=True)
 

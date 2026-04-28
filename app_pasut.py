@@ -6,7 +6,7 @@ from streamlit_autorefresh import st_autorefresh
 import os
 import time
 
-# --- 0. SMART AUTO REFRESH ---
+# --- 0. SMART AUTO REFRESH (15 Menit) ---
 now_sync = datetime.now()
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
 st_autorefresh(interval=max(seconds_to_next, 1) * 1000, key="datarefresh")
@@ -37,17 +37,15 @@ with st.sidebar:
         value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2))
     )
     st.divider()
-    st.caption("Gunakan filter untuk mengatur tampilan grafik.")
+    st.caption("Atur tanggal untuk melihat history dan prediksi.")
 
-# --- 3. HEADER UTAMA (CENTERED) ---
+# --- 3. HEADER UTAMA (Centered & Elegant) ---
 h1, h2, h3, h4, h5 = st.columns([2, 1, 0.7, 1, 2])
-
 with h3:
-    # Cek file logo dengan lebih teliti
     if os.path.exists(NAMA_FILE_LOGO):
         st.image(NAMA_FILE_LOGO, use_container_width=True)
     else:
-        st.write("⚓") # Simbol cadangan jika logo hilang
+        st.write("⚓")
 
 st.markdown(f"""
     <div style="text-align: center; margin-top: -15px;">
@@ -57,10 +55,9 @@ st.markdown(f"""
         </p>
     </div>
     """, unsafe_allow_html=True)
-
 st.divider()
 
-# --- 4. DATA LOGIC ---
+# --- 4. DATA LOGIC (Scraping & Load) ---
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -105,9 +102,9 @@ def fetch_aws_realtime():
             service = Service("/usr/bin/chromedriver")
             driver = webdriver.Chrome(service=service, options=options)
         driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
-        wait = WebDriverWait(driver, 30)
+        wait = WebDriverWait(driver, 20)
         element = wait.until(EC.visibility_of_element_located((By.ID, "waterlevel")))
-        time.sleep(5) 
+        time.sleep(3) 
         val = float(element.text.replace('m', '').replace(',', '.').strip())
         driver.quit()
         return val, datetime.now()
@@ -123,20 +120,16 @@ def load_prediction():
         cols = df.columns
         tgl_col = next((c for c in ['tanggal_prediksi', 'jam_group', 'Waktu_WIB', 'Waktu'] if c in cols), None)
         val_col = next((c for c in ['wl_prediksi', 'wl_final', 'Tinggi_Navigasi_m'] if c in cols), None)
-        if tgl_col: 
-            df[tgl_col] = pd.to_datetime(df[tgl_col])
+        if tgl_col: df[tgl_col] = pd.to_datetime(df[tgl_col])
         return df.sort_values(tgl_col), tgl_col, val_col
-    except: 
-        return None, None, None
+    except: return None, None, None
 
-# Run logic
 df_pred, col_tgl, col_val = load_prediction()
 aws_val, aws_time = fetch_aws_realtime()
 
 if aws_val is not None:
     waktu_catat = aws_time
-    if os.name != 'nt': 
-        waktu_catat += timedelta(hours=7)
+    if os.name != 'nt': waktu_catat += timedelta(hours=7)
     save_to_csv(waktu_catat, aws_val)
 
 # --- 5. METRICS & GRAFIK ---
@@ -148,8 +141,7 @@ if df_pred is not None:
     selisih_tren = h_nanti - h_pred
 
     df_hist = pd.read_csv(FILE_HISTORY) if os.path.exists(FILE_HISTORY) else pd.DataFrame()
-    if not df_hist.empty: 
-        df_hist['waktu'] = pd.to_datetime(df_hist['waktu'])
+    if not df_hist.empty: df_hist['waktu'] = pd.to_datetime(df_hist['waktu'])
 
     val_tampil = aws_val if aws_val else (df_hist['nilai'].iloc[-1] if not df_hist.empty else h_pred)
     
@@ -165,21 +157,22 @@ if df_pred is not None:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
 
     fig = go.Figure()
-    # Plot Prediksi (DIPAKSA MUNCUL TITIKNYA)
+    
+    # --- PLOT PREDIKSI (TITIK DIPAKSA MUNCUL) ---
     fig.add_trace(go.Scatter(
         x=df_plot[col_tgl], 
         y=df_plot[col_val], 
-        mode='lines+markers', # Ini kuncinya biar ada garis dan titik
+        mode='lines+markers', 
+        name='Prediksi',
         marker=dict(
-            size=4,           # Ukuran titik
-            symbol='circle',  # Bentuk titik bulat
-            opacity=0.7       # Biar gak terlalu tajam
+            size=6, 
+            color='rgba(0, 123, 255, 0.8)', 
+            line=dict(width=1, color='white') # Outline putih biar titik makin kontras
         ),
-        line=dict(color='rgba(0, 123, 255, 0.4)', width=2), 
-        name='Prediksi'
+        line=dict(color='rgba(0, 123, 255, 0.3)', width=2)
     ))
 
-    # Plot Aktual
+    # --- PLOT AKTUAL ---
     if not df_hist.empty:
         hist_view = df_hist[(df_hist['waktu'] >= t_start) & (df_hist['waktu'] <= t_end)]
         if not hist_view.empty:
@@ -187,21 +180,20 @@ if df_pred is not None:
                 x=hist_view['waktu'], 
                 y=hist_view['nilai'], 
                 mode='lines+markers', 
-                marker=dict(size=6, color='red'),
-                line=dict(color='red', width=2), 
-                name='Aktual'
+                marker=dict(size=7, color='red', symbol='square'),
+                line=dict(color='red', width=2.5), 
+                name='Aktual (AWS)'
             ))
 
     fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="orange", annotation_text="WASPADA ROB")
     
     fig.update_layout(
-        height=550, 
-        template="plotly_white", 
-        margin=dict(l=10, r=10, t=30, b=10), 
-        hovermode="x unified",
-        xaxis=dict(type='date', title="Waktu (WIB)"), 
-        yaxis=dict(title='Meter (m)')
+        height=550, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified",
+        xaxis=dict(type='date', title="Waktu (WIB)"), yaxis=dict(title='Meter (m)')
     )
+    # Paksa semua markers muncul meskipun data banyak
+    fig.update_traces(marker=dict(opacity=1), selector=dict(mode='lines+markers'))
+    
     st.plotly_chart(fig, use_container_width=True)
 
     # --- 6. FOOTER ---
@@ -210,17 +202,10 @@ if df_pred is not None:
     with c1: st.success(f"✅ ONLINE | Update: {sekarang.strftime('%H:%M:%S')} WIB")
     with c2:
         if os.path.exists(FILE_HISTORY):
-            with open(FILE_HISTORY, "rb") as f: 
-                st.download_button("📥 Export CSV", f, "history_priok.csv", "text/csv")
+            with open(FILE_HISTORY, "rb") as f: st.download_button("📥 Export CSV", f, "history_priok.csv", "text/csv")
     with c3:
-        if st.button("🔄 Refresh"): 
-            st.cache_data.clear()
-            st.rerun()
+        if st.button("🔄 Refresh"): st.cache_data.clear(); st.rerun()
 
-    st.markdown(f"""
-        <div style="text-align: center; color: #bbb; font-size: 10px; margin-top: 20px;">
-            © 2026 BMKG Maritim Tanjung Priok
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown(f"""<div style="text-align: center; color: #bbb; font-size: 10px; margin-top: 20px;">© 2026 BMKG Maritim Tanjung Priok</div>""", unsafe_allow_html=True)
 else:
     st.error("❌ File Prediksi Excel tidak ditemukan!")

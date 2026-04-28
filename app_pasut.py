@@ -19,6 +19,7 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     [data-testid="stMetricValue"] { font-size: 26px; font-weight: 800; color: #000; }
     .stMetric { background-color: #ffffff; padding: 15px; border-radius: 12px; border: 2px solid #e0e0e0; }
+    .signal-box { background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #004085; }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -27,7 +28,6 @@ st.markdown("""
 with st.sidebar:
     st.subheader("🗓️ Filter Waktu")
     sekarang = datetime.now()
-    # Penyesuaian timezone jika dideploy di server Linux/Cloud
     if os.name != 'nt': sekarang = sekarang + timedelta(hours=7)
 
     tgl_range = st.date_input(
@@ -112,9 +112,8 @@ def load_prediction():
     if not os.path.exists(FILE_PREDIKSI): return None, None, None
     try:
         df = pd.read_excel(FILE_PREDIKSI, engine='openpyxl')
-        cols = df.columns
-        tgl_col = next((c for c in ['tanggal_prediksi', 'jam_group', 'Waktu_WIB', 'Waktu'] if c in cols), None)
-        val_col = next((c for c in ['wl_prediksi', 'wl_final', 'Tinggi_Navigasi_m'] if c in cols), None)
+        tgl_col = next((c for c in ['tanggal_prediksi', 'jam_group', 'Waktu_WIB', 'Waktu'] if c in df.columns), None)
+        val_col = next((c for c in ['wl_prediksi', 'wl_final', 'Tinggi_Navigasi_m'] if c in df.columns), None)
         if tgl_col: df[tgl_col] = pd.to_datetime(df[tgl_col])
         return df.sort_values(tgl_col), tgl_col, val_col
     except: return None, None, None
@@ -129,6 +128,26 @@ if aws_val is not None:
 
 # --- 5. METRICS & GRAFIK ---
 if df_pred is not None:
+    # --- LOGIC HIGH/LOW HARIAN (Resistance & Support) ---
+    df_hari_ini = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
+    
+    if not df_hari_ini.empty:
+        idx_max = df_hari_ini[col_val].idxmax()
+        waktu_max = df_hari_ini.loc[idx_max, col_tgl]
+        val_max = df_hari_ini.loc[idx_max, col_val]
+        
+        idx_min = df_hari_ini[col_val].idxmin()
+        waktu_min = df_hari_ini.loc[idx_min, col_tgl]
+        val_min = df_hari_ini.loc[idx_min, col_val]
+        
+        st.markdown(f"""
+            <div class="signal-box">
+                <span style="font-weight: bold; color: #004085; font-size: 1.1rem;">🎯 Ringkasan Kondisi Hari Ini (Prediksi):</span><br>
+                🚀 <b>Puncak Pasang:</b> {waktu_max.strftime('%H:%M')} WIB (<span style="color:red">{val_max:.2f} m</span>) | 
+                ⚓ <b>Surut Terendah:</b> {waktu_min.strftime('%H:%M')} WIB (<span style="color:green">{val_min:.2f} m</span>)
+            </div>
+        """, unsafe_allow_html=True)
+
     idx_now = (df_pred[col_tgl] - sekarang).abs().idxmin()
     h_pred = df_pred.loc[idx_now, col_val]
     idx_nanti = (df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin()
@@ -152,21 +171,30 @@ if df_pred is not None:
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start_view) & (df_pred[col_tgl] <= t_end_view)]
     
-    # Trace Prediksi - Warna Biru lebih tegas (0.6)
+    # Trace Prediksi
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], mode='lines', line=dict(color='rgba(0, 102, 204, 0.6)', width=2), name='Prediksi'))
 
-    # Trace Aktual - Merah Tebal
+    # Trace Aktual
     if not df_hist.empty:
         hist_view = df_hist[(df_hist['waktu'] >= t_start_view) & (df_hist['waktu'] <= t_end_view)]
         fig.add_trace(go.Scatter(x=hist_view['waktu'], y=hist_view['nilai'], mode='lines', line=dict(color='#cc0000', width=3), name='Aktual'))
 
-    # Garis ROB
-    fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="#ff8c00", annotation_text="WASPADA ROB", annotation_font_color="#ff8c00")
-    
-    # GARIS SEKARANG (Vertical)
+    # Marker Puncak & Lembah Harian di Grafik
+    if not df_hari_ini.empty:
+        fig.add_trace(go.Scatter(
+            x=[waktu_max, waktu_min], 
+            y=[val_max, val_min],
+            mode='markers+text',
+            marker=dict(color=['#cc0000', '#004085'], size=12, symbol='diamond'),
+            text=['HIGH', 'LOW'],
+            textposition='top center',
+            name='Daily H/L'
+        ))
+
+    # Garis ROB & Sekarang
+    fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="#ff8c00", annotation_text="WASPADA ROB")
     fig.add_vline(x=sekarang, line_dash="dot", line_width=2, line_color="#008000")
     
-    # LABEL SEKARANG (Fixed Propery)
     fig.add_annotation(
         x=sekarang, y=1.05, yref="paper",
         text=f"SAAT INI ({sekarang.strftime('%H:%M')})",
@@ -176,10 +204,9 @@ if df_pred is not None:
         xanchor="left"
     )
 
-    # FIX UPDATE LAYOUT (Struktur Title Baru)
+    # Struktur Update Layout yang benar (Fix Titlefont Error)
     fig.update_layout(
-        height=550, template="plotly_white", 
-        margin=dict(l=10, r=10, t=70, b=10), 
+        height=550, template="plotly_white", margin=dict(l=10, r=10, t=75, b=10), 
         hovermode="x unified",
         xaxis=dict(
             type='date', 
@@ -196,7 +223,7 @@ if df_pred is not None:
     # --- 6. FOOTER ---
     st.divider()
     c1, c2 = st.columns([3, 1])
-    with c1: st.success(f"✅ SISTEM ONLINE | Update: {sekarang.strftime('%H:%M:%S')} WIB")
+    with c1: st.success(f"✅ SISTEM AKTIF | Update: {sekarang.strftime('%H:%M:%S')} WIB")
     with c2: 
         if st.button("🔄 Force Refresh"): st.cache_data.clear(); st.rerun()
 

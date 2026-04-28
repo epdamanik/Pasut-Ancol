@@ -6,8 +6,7 @@ from streamlit_autorefresh import st_autorefresh
 import os
 import time
 
-# --- 0. SMART AUTO REFRESH (Silent Sync) ---
-# Menghitung detik menuju menit bulat :00, :15, :30, atau :45 berikutnya
+# --- 0. SMART AUTO REFRESH (Sinkron 15 Menit) ---
 now_sync = datetime.now()
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
 st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
@@ -15,50 +14,55 @@ st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 # --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_icon="🌊")
 
-# CSS Custom - Tampilan Bersih & Profesional
+# Nama file logo sesuai info lu bre
+NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
+
+# CSS Custom - Diet 75% & Clean Look
 st.markdown("""
     <style>
     .stApp { background-color: #f8f9fa; }
-    [data-testid="stMetricValue"] { font-size: 24px; font-weight: bold; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #eee; }
+    [data-testid="stMetricValue"] { font-size: 22px; font-weight: bold; }
+    .stMetric { background-color: #ffffff; padding: 10px; border-radius: 10px; border: 1px solid #eee; }
     footer {visibility: hidden;}
+    /* Dikecilkan dikit padding header */
+    .header-box { margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR: LOGO, FILTER & OFFICIAL FOOTER ---
-URL_LOGO_BMKG = "https://upload.wikimedia.org/wikipedia/commons/b/ba/Logo_BMKG.png"
+# --- 2. SIDEBAR (FILTER SAJA) ---
+with st.sidebar:
+    st.subheader("🗓️ Filter Waktu")
+    sekarang = datetime.now()
+    if os.name != 'nt': sekarang = sekarang + timedelta(hours=7)
 
-# Header Sidebar
-st.sidebar.image(URL_LOGO_BMKG, width=100)
-st.sidebar.markdown("### **PASUT MONITORING**")
-st.sidebar.info("⚓ Stasiun Pelabuhan Tanjung Priok")
-st.sidebar.divider()
+    tgl_range = st.date_input(
+        "Rentang Grafik", 
+        value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2))
+    )
+    st.divider()
+    st.caption("Gunakan filter untuk mengatur tampilan grafik prediksi dan history.")
 
-# Penyesuaian Zona Waktu (Local vs Cloud)
-sekarang = datetime.now()
-if os.name != 'nt':  # Jika deploy di Streamlit Cloud (Linux), ubah ke WIB
-    sekarang = sekarang + timedelta(hours=7)
+# --- 3. HEADER UTAMA (CENTERED & COMPACT - 75% SIZE) ---
+# Trik 5 kolom dengan kolom tengah lebih ramping (0.7)
+h1, h2, h3, h4, h5 = st.columns([2, 1, 0.7, 1, 2])
 
-# Filter Rentang Tanggal
-st.sidebar.header("🗓️ Filter Waktu")
-tgl_range = st.sidebar.date_input(
-    "Rentang Pantauan", 
-    value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2))
-)
-st.sidebar.divider()
+with h3:
+    if os.path.exists(NAMA_FILE_LOGO):
+        st.image(NAMA_FILE_LOGO, use_container_width=True)
 
-# Official Footer di bawah Sidebar
-st.sidebar.markdown(f"""
-    <div style="margin-top: 150px; text-align: center;">
-        <img src="{URL_LOGO_BMKG}" width="40">
-        <p style="font-size: 10px; color: #666; margin-top: 10px;">
-            © 2026 All Rights Reserved<br>
-            <b>STASIUN METEOROLOGI MARITIM<br>TANJUNG PRIOK</b>
+# Tulisan dikecilkan biar elegan
+st.markdown(f"""
+    <div style="text-align: center; margin-top: -15px;">
+        <h2 style="margin-bottom: 0px; font-size: 1.8rem; color: #0E1117; letter-spacing: 1px;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
+        <p style="color: #1f77b4; font-weight: 500; font-size: 0.95rem; margin-top: 0px;">
+            Monitoring Water Level AWS Maritim Tanjung Priok
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-# --- IMPORT SELENIUM ---
+st.divider()
+
+# --- 4. DATA LOGIC (Scraping & Load) ---
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -66,32 +70,26 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- 2. PENGATURAN FILE ---
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY = 'history_aws_priok.csv' 
 BATAS_ROB = 2.5
 
 def save_to_csv(waktu, nilai):
-    # Logika Pembulatan: Menit :14 ditarik ke :15, :02 ditarik ke :00
     discard = timedelta(minutes=waktu.minute % 15, seconds=waktu.second, microseconds=waktu.microsecond)
     waktu_bulat = waktu - discard
     if discard >= timedelta(minutes=7, seconds=30):
         waktu_bulat += timedelta(minutes=15)
-    
     waktu_str = waktu_bulat.strftime('%Y-%m-%d %H:%M')
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
-    
     if not os.path.exists(FILE_HISTORY):
         new_data.to_csv(FILE_HISTORY, index=False)
     else:
         try:
             old_data = pd.read_csv(FILE_HISTORY)
-            # Pastikan hanya simpan satu data unik per interval 15 menit
             combined = pd.concat([old_data, new_data]).drop_duplicates(subset=['waktu'], keep='last')
             combined.to_csv(FILE_HISTORY, index=False)
         except: pass
 
-# --- 3. FUNGSI SCRAPING AWS ---
 @st.cache_data(ttl=800)
 def fetch_aws_realtime():
     options = Options()
@@ -108,7 +106,6 @@ def fetch_aws_realtime():
             options.binary_location = "/usr/bin/chromium"
             service = Service("/usr/bin/chromedriver")
             driver = webdriver.Chrome(service=service, options=options)
-        
         driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
         wait = WebDriverWait(driver, 30)
         element = wait.until(EC.visibility_of_element_located((By.ID, "waterlevel")))
@@ -120,7 +117,6 @@ def fetch_aws_realtime():
         if driver: driver.quit()
         return None, None
 
-# --- 4. LOAD DATA PREDIKSI ---
 @st.cache_data(ttl=3600)
 def load_prediction():
     if not os.path.exists(FILE_PREDIKSI): return None, None, None
@@ -133,7 +129,6 @@ def load_prediction():
         return df.sort_values(tgl_col), tgl_col, val_col
     except: return None, None, None
 
-# Eksekusi Scraping & Saving
 df_pred, col_tgl, col_val = load_prediction()
 aws_val, aws_time = fetch_aws_realtime()
 
@@ -142,11 +137,8 @@ if aws_val is not None:
     if os.name != 'nt': waktu_catat += timedelta(hours=7)
     save_to_csv(waktu_catat, aws_val)
 
-# --- 6. DISPLAY DASHBOARD ---
-st.title("⚓ Monitoring Pasut AWS Tg. Priok")
-
+# --- 5. METRICS & GRAFIK ---
 if df_pred is not None:
-    # Perhitungan Prediksi & Tren
     idx_now = (df_pred[col_tgl] - sekarang).abs().idxmin()
     h_pred = df_pred.loc[idx_now, col_val]
     idx_nanti = (df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin()
@@ -158,55 +150,42 @@ if df_pred is not None:
 
     val_tampil = aws_val if aws_val else (df_hist['nilai'].iloc[-1] if not df_hist.empty else h_pred)
     
-    # Row Metrik Utama
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Tinggi Air Aktual (AWS)", f"{val_tampil:.2f} m", delta=f"{val_tampil - h_pred:.2f} m" if aws_val else None, delta_color="inverse")
-    m2.metric("Tren Mendatang", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
-    m3.metric("Prediksi Saat Ini", f"{h_pred:.2f} m")
-    m4.metric("Batas Aman ROB", f"{BATAS_ROB} m")
+    m1.metric("Aktual (AWS)", f"{val_tampil:.2f} m", delta=f"{val_tampil - h_pred:.2f} m" if aws_val else None, delta_color="inverse")
+    m2.metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
+    m3.metric("Prediksi", f"{h_pred:.2f} m")
+    m4.metric("Batas ROB", f"{BATAS_ROB} m")
 
-    # --- 7. GRAFIK INTERAKTIF ---
     t_start_view = datetime.combine(tgl_range[0], datetime.min.time()) if len(tgl_range)==2 else sekarang - timedelta(hours=24)
     t_end_view = datetime.combine(tgl_range[1], datetime.max.time()) if len(tgl_range)==2 else sekarang + timedelta(hours=24)
 
     fig = go.Figure()
-    
-    # Layer 1: Garis Prediksi
     df_plot = df_pred[(df_pred[col_tgl] >= t_start_view) & (df_pred[col_tgl] <= t_end_view)]
-    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], mode='lines', line=dict(color='rgba(0, 123, 255, 0.3)', width=2), name='Garis Prediksi', hoverinfo='skip'))
+    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], mode='lines', line=dict(color='rgba(0, 123, 255, 0.3)', width=2), name='Prediksi'))
 
-    # Layer 2: Garis Aktual (History)
     if not df_hist.empty:
         hist_view = df_hist[(df_hist['waktu'] >= t_start_view) & (df_hist['waktu'] <= t_end_view)]
-        fig.add_trace(go.Scatter(x=hist_view['waktu'], y=hist_view['nilai'], mode='lines', line=dict(color='red', width=2.5), name='Garis Aktual (AWS)', hoverinfo='skip'))
-
-    # Layer 3 & 4: Live Double Markers
-    if t_start_view <= sekarang <= t_end_view:
-        # Titik Prediksi (Circle)
-        fig.add_trace(go.Scatter(x=[sekarang], y=[h_pred], mode='markers+text', marker=dict(color='rgba(0, 123, 255, 0.8)', size=14, symbol='circle', line=dict(width=2, color='white')), text=[f"<b>PRED: {h_pred:.2f}m</b>"], textposition="bottom center", name='Titik Prediksi'))
-        # Titik Aktual (Diamond)
-        fig.add_trace(go.Scatter(x=[sekarang], y=[val_tampil], mode='markers+text', marker=dict(color='red', size=16, symbol='diamond', line=dict(width=2, color='white')), text=[f"<b>LIVE: {val_tampil:.2f}m</b>"], textposition="top center", name='Titik Aktual'))
+        fig.add_trace(go.Scatter(x=hist_view['waktu'], y=hist_view['nilai'], mode='lines', line=dict(color='red', width=2.5), name='Aktual'))
 
     fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="orange", annotation_text="WASPADA ROB")
-    
-    # Konfigurasi Hover & Spikelines
-    fig.update_layout(
-        height=650, template="plotly_white", margin=dict(l=20, r=20, t=50, b=20),
-        hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(showspikes=True, spikemode="across", spikesnap="cursor", showline=True, spikedash="dot", type='date'),
-        yaxis=dict(showspikes=True, spikemode="across", spikesnap="cursor", spikedash="dot", title='Ketinggian (m)')
-    )
-    
+    fig.update_layout(height=550, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified",
+                      xaxis=dict(type='date'), yaxis=dict(title='Meter (m)'))
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- 8. FOOTER HALAMAN UTAMA ---
+    # --- 6. FOOTER ---
     st.divider()
     c1, c2, c3 = st.columns([2, 1, 1])
-    with c1: st.success(f"✅ Sistem Berjalan Normal | Terakhir Update: {sekarang.strftime('%H:%M:%S')} WIB")
+    with c1: st.success(f"✅ ONLINE | Update: {sekarang.strftime('%H:%M:%S')} WIB")
     with c2:
         if os.path.exists(FILE_HISTORY):
             with open(FILE_HISTORY, "rb") as f: st.download_button("📥 Export CSV", f, "history_priok.csv", "text/csv")
     with c3:
-        if st.button("🔄 Refresh Data"): st.cache_data.clear(); st.rerun()
+        if st.button("🔄 Refresh"): st.cache_data.clear(); st.rerun()
+
+    st.markdown(f"""
+        <div style="text-align: center; color: #bbb; font-size: 10px; margin-top: 20px;">
+            © 2026 BMKG Maritim Tanjung Priok
+        </div>
+        """, unsafe_allow_html=True)
 else:
-    st.error("❌ File Prediksi tidak ditemukan!")
+    st.error("❌ File Prediksi Excel tidak ditemukan!")

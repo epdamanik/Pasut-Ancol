@@ -4,125 +4,126 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 import os
+import time
 
-# --- 0. AUTO REFRESH (Update tiap 5 menit) ---
-st_autorefresh(interval=5 * 60 * 1000, key="datarefresh")
+# --- IMPORT SELENIUM ---
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+
+# --- 0. AUTO REFRESH (Update tiap 15 Menit) ---
+# 15 menit * 60 detik * 1000 milidetik
+st_autorefresh(interval=15 * 60 * 1000, key="datarefresh")
 
 # --- 1. KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Pasut ANCOL 2026", layout="wide", page_icon="🌊")
+st.set_page_config(page_title="Pasut ANCOL 15-Min", layout="wide", page_icon="🌊")
 
-st.markdown("""
-    <style>
-    .stApp { background-color: #f8f9fa; color: #1e1e1e; }
-    [data-testid="stMetricValue"] { font-size: 28px; color: #007bff; }
-    .stMetric { 
-        background-color: #ffffff; 
-        padding: 15px; 
-        border-radius: 10px; 
-        border: 1px solid #dee2e6; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 2. PENGATURAN DATA & LOAD ---
-FILE_NAME = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
+# Nama file data
+FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
+FILE_HISTORY = 'history_aws.csv'
 BATAS_ROB = 2.5
 
-@st.cache_data(ttl=600)
-def load_data(filename):
-    if not os.path.exists(filename):
-        return None, f"⚠️ File '{filename}' tidak ditemukan di repository.", None
-    
-    try:
-        # Load dengan engine openpyxl
-        df = pd.read_excel(filename, engine='openpyxl')
-        cols = list(df.columns)
-        
-        # 1. Deteksi Kolom Waktu (Mencari kemungkinan nama)
-        tgl_candidates = ['tanggal_prediksi', 'jam_group', 'Waktu_WIB', 'Waktu', 'Datetime']
-        tgl_col = next((c for c in tgl_candidates if c in cols), None)
-        
-        # 2. Deteksi Kolom Ketinggian (Mencari kemungkinan nama)
-        val_candidates = ['wl_prediksi', 'wl_final', 'Tinggi_Navigasi_m', 'Ketinggian', 'Water_Level']
-        val_col = next((c for c in val_candidates if c in cols), None)
-        
-        if not tgl_col or not val_col:
-            return None, f"❌ Kolom tidak dikenali! Kolom di Excel Anda: {cols}", None
-            
-        df[tgl_col] = pd.to_datetime(df[tgl_col])
-        df = df.sort_values(tgl_col)
-        return df, tgl_col, val_col
-    except Exception as e:
-        return None, f"❌ Gagal membaca Excel: {str(e)}", None
-
-# Eksekusi Load Data
-res_df, msg, col_val = load_data(FILE_NAME)
-
-# --- 3. LOGIKA UTAMA ---
-if res_df is not None:
-    df, tgl, val = res_df, msg, col_val
-    
-    # Waktu Jakarta (WIB)
-    sekarang_dt = datetime.utcnow() + timedelta(hours=7) 
-    
-    st.sidebar.title("⚓ Navigasi Panel")
-    st.sidebar.write(f"**Waktu Sekarang:** {sekarang_dt.strftime('%d %b %Y | %H:%M')} WIB")
-    
-    min_date = df[tgl].min().date()
-    max_date = df[tgl].max().date()
-    
-    # Proteksi jika hari ini di luar range data
-    default_start = max(min(sekarang_dt.date(), max_date), min_date)
-    default_end = min(default_start + timedelta(days=7), max_date)
-    
-    rentang = st.sidebar.date_input(
-        "Rentang Waktu:", 
-        value=(default_start, default_end),
-        min_value=min_date, 
-        max_value=max_date
-    )
-
-    if isinstance(rentang, tuple) and len(rentang) == 2:
-        df_view = df[(df[tgl].dt.date >= rentang[0]) & (df[tgl].dt.date <= rentang[1])].copy()
+# --- 2. FUNGSI PERMANEN (CSV) ---
+def save_to_csv(waktu, nilai):
+    new_data = pd.DataFrame({'waktu': [waktu], 'nilai': [nilai]})
+    if not os.path.exists(FILE_HISTORY):
+        new_data.to_csv(FILE_HISTORY, index=False)
     else:
-        df_view = df[df[tgl].dt.date == rentang[0]].copy()
+        old_data = pd.read_csv(FILE_HISTORY)
+        # Gabung dan hapus duplikat berdasarkan waktu menit yang sama
+        combined = pd.concat([old_data, new_data]).drop_duplicates(subset=['waktu'])
+        combined.to_csv(FILE_HISTORY, index=False)
+
+# --- 3. FUNGSI SCRAPING ---
+@st.cache_data(ttl=800) # Sedikit di bawah 15 menit
+def fetch_aws_realtime():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    try:
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        driver.get("http://202.90.199.132/aws-new/monitoring/3000000018")
+        time.sleep(5)
+        val_text = driver.find_element(By.ID, "waterlevel").text.strip()
+        driver.quit()
+        val = float(val_text.replace('m', ''))
+        return val, datetime.now()
+    except:
+        return None, None
+
+# --- 4. LOAD DATA ---
+@st.cache_data(ttl=3600)
+def load_prediction(filename):
+    if not os.path.exists(filename): return None, "File Prediksi Hilang", None
+    df = pd.read_excel(filename, engine='openpyxl')
+    cols = df.columns
+    tgl_col = next((c for c in ['tanggal_prediksi', 'jam_group', 'Waktu_WIB', 'Waktu'] if c in cols), None)
+    val_col = next((c for c in ['wl_prediksi', 'wl_final', 'Tinggi_Navigasi_m'] if c in cols), None)
+    df[tgl_col] = pd.to_datetime(df[tgl_col])
+    return df.sort_values(tgl_col), tgl_col, val_col
+
+# --- EKSEKUSI DATA ---
+df_pred, col_tgl, col_val = load_prediction(FILE_PREDIKSI)
+aws_val, aws_time = fetch_aws_realtime()
+
+# Simpan ke CSV jika berhasil scrap
+if aws_val is not None:
+    save_to_csv(aws_time.strftime('%Y-%m-%d %H:%M'), aws_val)
+
+# --- 5. UI DASHBOARD ---
+st.title("🌊 Dashboard Pasut Ancol (15-Min Monitoring)")
+
+if df_pred is not None:
+    sekarang = datetime.now()
+    
+    # Ambil Data History dari CSV
+    df_hist = pd.read_csv(FILE_HISTORY) if os.path.exists(FILE_HISTORY) else pd.DataFrame()
+    if not df_hist.empty:
+        df_hist['waktu'] = pd.to_datetime(df_hist['waktu'])
 
     # Logika Metrik
-    msl = df[val].mean()
-    idx_now = (df[tgl] - sekarang_dt).abs().idxmin()
-    h_now = df.loc[idx_now, val]
+    idx_now = (df_pred[col_tgl] - sekarang).abs().idxmin()
+    h_pred = df_pred.loc[idx_now, col_val]
     
-    status_elevasi = "PASANG" if h_now >= msl else "SURUT"
-    prediksi = "STABIL"
-    if idx_now + 1 < len(df):
-        prediksi = f"AKAN {'NAIK' if df.loc[idx_now + 1, val] > h_now else 'TURUN'}"
+    m1, m2, m3 = st.columns(3)
+    val_akhir = aws_val if aws_val else (df_hist['nilai'].iloc[-1] if not df_hist.empty else h_pred)
+    
+    m1.metric("AWS Real-time", f"{val_akhir:.2f} m")
+    m2.metric("Prediksi Model", f"{h_pred:.2f} m")
+    m3.metric("Selisih (Surge)", f"{val_akhir - h_pred:.2f} m")
 
-    # Dashboard
-    st.title("🌊 Monitoring Pasut Ancol 2026")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Tinggi Air", f"{h_now:.2f} m")
-    m2.metric("Status", status_elevasi, f"MSL: {msl:.2f}m")
-    m3.metric("Tren", prediksi)
-    m4.metric("Batas ROB", f"{BATAS_ROB} m")
-
-    # Grafik
+    # --- 6. GRAFIK ---
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df_view[tgl], y=df_view[val], mode='lines', line=dict(color='#007bff', width=3), name='Elevasi'))
-    
-    if rentang[0] <= sekarang_dt.date() <= rentang[1]:
-        fig.add_trace(go.Scatter(x=[df.loc[idx_now, tgl]], y=[h_now], mode='markers', marker=dict(color='red', size=10), name='Sekarang'))
 
-    fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="red", annotation_text="BATAS ROB")
-    fig.update_layout(plot_bgcolor='white', height=500, xaxis_title="Waktu", yaxis_title="Meter", hovermode="x unified")
+    # A. Garis Prediksi (Biru Tipis)
+    t_start = sekarang - timedelta(hours=12)
+    t_end = sekarang + timedelta(hours=12)
+    df_view = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
+    
+    fig.add_trace(go.Scatter(x=df_view[col_tgl], y=df_view[col_val], mode='lines+markers',
+                             line=dict(color='rgba(0, 123, 255, 0.3)', dash='dot'),
+                             marker=dict(size=3, color='#007bff'), name='Prediksi Astronomis'))
+
+    # B. Jejak AWS Permanen (Garis Merah Solid)
+    if not df_hist.empty:
+        # Hanya tampilkan history 24 jam terakhir biar gak berat grafiknya
+        hist_view = df_hist[df_hist['waktu'] >= (sekarang - timedelta(hours=24))]
+        fig.add_trace(go.Scatter(x=hist_view['waktu'], y=hist_view['nilai'],
+                                 mode='lines+markers', line=dict(color='red', width=2),
+                                 marker=dict(size=5), name='Data Aktual (AWS)'))
+
+    # C. Titik Diamond Sekarang
+    fig.add_trace(go.Scatter(x=[sekarang], y=[val_akhir], mode='markers+text',
+                             marker=dict(color='red', size=12, symbol='diamond', line=dict(width=2, color='white')),
+                             text=[f"<b>SEKARANG: {val_akhir}m</b>"], textposition="top center",
+                             name='Posisi Saat Ini'))
+
+    fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="orange", annotation_text="WASPADA ROB")
+    fig.update_layout(height=550, template="plotly_white", hovermode="x unified", xaxis_title="Waktu (WIB)")
     st.plotly_chart(fig, use_container_width=True)
 
-    st.sidebar.divider()
-    if h_now >= BATAS_ROB:
-        st.sidebar.error("🚨 **WASPADA ROB!**")
-    else:
-        st.sidebar.success("✅ **KONDISI AMAN**")
-else:
-    st.error(msg)
-    # Debugging folder jika masih error
-    st.write("Isi folder saat ini:", os.listdir("."))
+    st.success(f"✅ Data diperbarui otomatis tiap 15 menit. Terakhir update: {sekarang.strftime('%H:%M:%S')}")
+    st.info(f"📂 Jejak AWS tersimpan permanen di: `{FILE_HISTORY}`")

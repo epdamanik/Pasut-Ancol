@@ -96,8 +96,9 @@ LIMIT_SENSOR_ERROR = 3.5
 def save_to_csv(filename, waktu, nilai):
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
     
+    # 1. TENTUKAN TARGET TIMESTAMP
     if "bpbd" in filename.lower():
-        if waktu.minute >= 30:
+        if waktu.minute >= 30: # Bisa kamu ganti 45 sesuai kebutuhanmu
             waktu_fixed = waktu.replace(minute=0, second=0, microsecond=0)
             waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
         else:
@@ -107,12 +108,25 @@ def save_to_csv(filename, waktu, nilai):
         waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
         waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
 
-    if os.path.exists(filename):
+    # 2. PROSES SIMPAN & TIMPA DATA (OVERWRITE)
+    new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
+    
+    if not os.path.exists(filename):
+        # Kalau file belum ada, langsung buat baru
+        new_data.to_csv(filename, index=False)
+    else:
         try:
-            old_data_check = pd.read_csv(filename)
-            if waktu_str in old_data_check['waktu'].values:
-                return 
-        except: pass
+            old_data = pd.read_csv(filename)
+            
+            # Hapus baris lama yang jam-nya sama dengan jam saat ini (agar tidak double)
+            old_data = old_data[old_data['waktu'] != waktu_str]
+            
+            # Gabungkan data lama dengan data tarikan terbaru, lalu simpan
+            combined = pd.concat([old_data, new_data])
+            combined.sort_values('waktu', inplace=True)
+            combined.to_csv(filename, index=False)
+        except: 
+            pass
 
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     if not os.path.exists(filename):

@@ -77,11 +77,24 @@ st.divider()
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
-LIMIT_SENSOR_ERROR = 3.5  # <--- Balik lagi filternya
+LIMIT_SENSOR_ERROR = 3.5 
 
 def save_to_csv(filename, waktu, nilai):
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
-    waktu_str = waktu.strftime('%Y-%m-%d %H:%M')
+    
+    # LOGIKA KHUSUS PASAR IKAN (Hanya simpan di menit 30 untuk data Jam X)
+    if "bpbd" in filename.lower():
+        if waktu.minute == 30:
+            waktu_fixed = waktu.replace(minute=0, second=0, microsecond=0)
+            waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
+        else:
+            return
+    # LOGIKA AWS (Tetap per 15 menit)
+    else:
+        menit_bulat = (waktu.minute // 15) * 15
+        waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
+        waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
+
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     if not os.path.exists(filename):
         new_data.to_csv(filename, index=False)
@@ -89,6 +102,7 @@ def save_to_csv(filename, waktu, nilai):
         try:
             old_data = pd.read_csv(filename)
             combined = pd.concat([old_data, new_data]).drop_duplicates(subset=['waktu'], keep='last')
+            combined.sort_values('waktu', inplace=True)
             combined.to_csv(filename, index=False)
         except: pass
 
@@ -202,8 +216,14 @@ if df_pred is not None:
     )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # Footer
+    # --- 8. FOOTER & DOWNLOAD ---
     st.divider()
-    f_col = st.columns(3)
-    with f_col[2]: 
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        if os.path.exists(FILE_HISTORY_AWS):
+            st.download_button("📥 Download AWS", open(FILE_HISTORY_AWS, 'rb'), "history_aws.csv", "text/csv", use_container_width=True)
+    with f2:
+        if os.path.exists(FILE_HISTORY_BPBD):
+            st.download_button("📥 Download Psr. Ikan", open(FILE_HISTORY_BPBD, 'rb'), "history_bpbd.csv", "text/csv", use_container_width=True)
+    with f3: 
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()

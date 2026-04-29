@@ -82,30 +82,25 @@ LIMIT_SENSOR_ERROR = 3.5
 def save_to_csv(filename, waktu, nilai):
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
     
-    # 1. TENTUKAN TARGET TIMESTAMP
     if "bpbd" in filename.lower():
-        # LOGIKA KHUSUS PASAR IKAN: Hanya simpan kalau web udah rilis data baru (menit >= 30)
         if waktu.minute >= 30:
             waktu_fixed = waktu.replace(minute=0, second=0, microsecond=0)
             waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
         else:
-            return # Belum jam X:30, jangan simpan dulu
+            return 
     else:
-        # LOGIKA AWS: Tetap per 15 menit
         menit_bulat = (waktu.minute // 15) * 15
         waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
         waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
 
-    # 2. CEK DUPLIKASI (Supaya gak nyatet berkali-kali)
     if os.path.exists(filename):
         try:
             old_data_check = pd.read_csv(filename)
             if waktu_str in old_data_check['waktu'].values:
-                return # Sudah ada data di jam ini, stop proses!
+                return 
         except: 
             pass
 
-    # 3. SIMPAN DATA
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     if not os.path.exists(filename):
         new_data.to_csv(filename, index=False)
@@ -177,26 +172,50 @@ save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
-    # Summary Box (Hanya untuk Teks Hari Ini)
+    # Summary Box
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         i_max, i_min = df_h[col_val].idxmax(), df_h[col_val].idxmin()
-        
-        # Ambil nilai dan jam untuk Max/Min hari ini (buat Teks di Summary Box)
         val_max = df_h.loc[i_max, col_val]
         jam_max = df_h.loc[i_max, col_tgl].strftime("%H:%M")
-        
         val_min = df_h.loc[i_min, col_val]
         jam_min = df_h.loc[i_min, col_tgl].strftime("%H:%M")
-        
         st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {val_max:.2f}m ({jam_max} WIB)</span> | <span style="color: #3b82f6;">▼ MIN: {val_min:.2f}m ({jam_min} WIB)</span></span></div>', unsafe_allow_html=True)
 
-    # Metrics
-    m_col = st.columns(4)
+    # --- HITUNG SELISIH TERHADAP PREDIKSI ---
+    # Ambil nilai prediksi terdekat dengan waktu sekarang
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
-    m_col[0].metric("Prediksi", f"{h_now:.2f} m")
-    m_col[1].metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A")
-    m_col[2].metric("TMA Pintu Air Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A")
+    
+    # Selisih AWS
+    diff_aws = None
+    if live_data['aws'] is not None:
+        diff_aws = live_data['aws'] - h_now
+
+    # Selisih BPBD
+    diff_bpbd = None
+    if live_data['bpbd'] is not None:
+        diff_bpbd = live_data['bpbd'] - h_now
+
+    # Metrics Layout
+    m_col = st.columns(4)
+    m_col[0].metric("Prediksi (Model)", f"{h_now:.2f} m")
+    
+    # Metric AWS + Delta Selisih
+    m_col[1].metric(
+        label="TMA AWS Tj. Priok", 
+        value=f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A",
+        delta=f"{diff_aws:+.2f} m dr prediksi" if diff_aws is not None else None,
+        delta_color="inverse" # Merah jika lebih tinggi (positif), Hijau jika lebih rendah
+    )
+    
+    # Metric BPBD + Delta Selisih
+    m_col[2].metric(
+        label="TMA Pintu Air Psr. Ikan", 
+        value=f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A",
+        delta=f"{diff_bpbd:+.2f} m dr prediksi" if diff_bpbd is not None else None,
+        delta_color="inverse"
+    )
+    
     m_col[3].metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] - h_now) > 0.05 else "📉 SURUT")
 
     # Chart
@@ -206,37 +225,24 @@ if df_pred is not None:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
     
-    # --- TAMBAHAN: Titik Max & Min SETIAP HARI di Grafik ---
     if not df_plot.empty:
-        # Cari index nilai max dan min untuk "setiap hari" di df_plot
         idx_daily_max = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmax()
         idx_daily_min = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmin()
-
         df_max = df_plot.loc[idx_daily_max]
         df_min = df_plot.loc[idx_daily_min]
 
-        # Plot titik Max untuk Setiap Hari
         fig.add_trace(go.Scatter(
-            x=df_max[col_tgl], y=df_max[col_val], 
-            mode='markers+text', name='Max Harian',
+            x=df_max[col_tgl], y=df_max[col_val], mode='markers+text', name='Max Harian',
             marker=dict(color='#ef4444', size=10, symbol='triangle-up'),
-            text=[f"{v:.2f}m" for v in df_max[col_val]],
-            textposition="top center",
-            textfont=dict(color='#ef4444', size=11, family="Arial Black"),
-            showlegend=False
+            text=[f"{v:.2f}m" for v in df_max[col_val]], textposition="top center",
+            textfont=dict(color='#ef4444', size=11, family="Arial Black"), showlegend=False
         ))
-
-        # Plot titik Min untuk Setiap Hari
         fig.add_trace(go.Scatter(
-            x=df_min[col_tgl], y=df_min[col_val], 
-            mode='markers+text', name='Min Harian',
+            x=df_min[col_tgl], y=df_min[col_val], mode='markers+text', name='Min Harian',
             marker=dict(color='#3b82f6', size=10, symbol='triangle-down'),
-            text=[f"{v:.2f}m" for v in df_min[col_val]],
-            textposition="bottom center",
-            textfont=dict(color='#3b82f6', size=11, family="Arial Black"),
-            showlegend=False
+            text=[f"{v:.2f}m" for v in df_min[col_val]], textposition="bottom center",
+            textfont=dict(color='#3b82f6', size=11, family="Arial Black"), showlegend=False
         ))
-    # ------------------------------------------------------
 
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
@@ -248,13 +254,10 @@ if df_pred is not None:
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Pintu air Psr. Ikan', mode='lines+markers', line=dict(color='#f59e0b', width=4)))
 
-    # Garis Sekarang & Rob
     fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=3, dash="dash"))
     fig.add_annotation(
-        x=sekarang, y=1.05, yref="paper",
-        text=f"<b>WAKTU SEKARANG ({sekarang.strftime('%H:%M')})</b>",
-        showarrow=False, font=dict(size=12, color="#22c55e"),
-        bgcolor="white", bordercolor="#22c55e", borderwidth=1, borderpad=4, yanchor="bottom"
+        x=sekarang, y=1.05, yref="paper", text=f"<b>WAKTU SEKARANG ({sekarang.strftime('%H:%M')})</b>",
+        showarrow=False, font=dict(size=12, color="#22c55e"), bgcolor="white", bordercolor="#22c55e", borderwidth=1, borderpad=4, yanchor="bottom"
     )
     
     fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>", annotation_position="top left")

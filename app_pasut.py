@@ -144,13 +144,11 @@ save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
-    # Summary Box
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         i_max, i_min = df_h[col_val].idxmax(), df_h[col_val].idxmin()
         st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {df_h.loc[i_max, col_val]:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {df_h.loc[i_min, col_val]:.2f}m</span></span></div>', unsafe_allow_html=True)
 
-    # Metrics
     m_col = st.columns(4)
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
     m_col[0].metric("Prediksi", f"{h_now:.2f} m")
@@ -158,27 +156,26 @@ if df_pred is not None:
     m_col[2].metric("BPBD Psr Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A")
     m_col[3].metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] - h_now) > 0.05 else "📉 SURUT")
 
-    # Chart Section
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # Prediksi (Dashed)
+    # Prediksi
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
     
-    # AWS Priok (TEBAL + TITIK)
+    # AWS Priok
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end)]
         fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Priok', mode='lines+markers', marker=dict(size=6), line=dict(color='#0033cc', width=4)))
 
-    # BPBD Psr Ikan (ORANGE)
+    # BPBD Psr Ikan
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end)]
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Psr Ikan', mode='lines+markers', line=dict(color='#f59e0b', width=4)))
 
-    # Garis Sekarang & Label (FIXED VERSION)
+    # Garis Sekarang & Label
     fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=3, dash="dash"))
     fig.add_annotation(
         x=sekarang, y=1.05, yref="paper",
@@ -187,7 +184,9 @@ if df_pred is not None:
         bgcolor="white", bordercolor="#22c55e", borderwidth=1, borderpad=4, yanchor="bottom"
     )
     
-    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS ROB")
+    # Garis Rob (DI SINI BRO PERBAIKANNYA)
+    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB (2.5m)</b>", annotation_position="top left")
+    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA (2.3m)</b>", annotation_position="bottom left")
 
     fig.update_layout(height=500, template="plotly_white", hovermode="x unified", legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"), margin=dict(l=10, r=10, t=60, b=10))
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})

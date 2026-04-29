@@ -14,12 +14,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- 0. SMART AUTO REFRESH ---
+# --- 0. SMART AUTO REFRESH (Setiap 15 Menit) ---
 now_sync = datetime.now()
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
 st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 
-# --- 1. KONFIGURASI HALAMAN ---
+# --- 1. KONFIGURASI HALAMAN & CSS ---
 st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_icon="🌊")
 
 st.markdown("""
@@ -32,12 +32,18 @@ st.markdown("""
         border-left: 5px solid #1e40af !important; padding: 15px !important; border-radius: 10px !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
         min-height: 140px !important; max-height: 140px !important;
+        display: flex !important; flex-direction: column !important; justify-content: center !important;
+    }
+    @media (max-width: 768px) {
+        div[data-testid="stMetric"] { min-height: 110px !important; max-height: 110px !important; margin-bottom: 10px !important; }
+        [data-testid="stMetricValue"] { font-size: 20px !important; }
+        [data-testid="stMetricLabel"] { height: 2rem !important; font-size: 0.85rem !important; }
     }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. LOGIC WAKTU ---
+# --- 2. LOGIC WAKTU (FORCE ASIA/JAKARTA) ---
 tz_jkt = pytz.timezone('Asia/Jakarta')
 sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
 
@@ -87,6 +93,7 @@ def fetch_all_realtime():
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36")
     driver = None
     res = {"aws": None, "bpbd": None}
     try:
@@ -156,7 +163,7 @@ if df_pred is not None:
     idx_nanti = (df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin()
     selisih_tren = df_pred.loc[idx_nanti, col_val] - h_pred
 
-    # Metrics
+    # Metrics Grid
     m_col = st.columns(4)
     m_col[0].metric("Prediksi Pasut", f"{h_pred:.2f} m")
     m_col[1].metric("AWS Tg. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", 
@@ -165,38 +172,40 @@ if df_pred is not None:
                     delta=f"{live_data['bpbd'] - h_pred:+.2f} m" if live_data["bpbd"] else None, delta_color="inverse")
     m_col[3].metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
 
-    # --- CHART LOGIC (THE STABLE VERSION) ---
-    t_start = datetime.combine(tgl_range[0], datetime.min.time())
-    t_end = datetime.combine(tgl_range[1], datetime.max.time())
-    
+    # Chart
+    t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # Plotting Prediksi
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='rgba(15, 23, 42, 0.2)', width=2)))
     
-    # Plotting History
     if os.path.exists(FILE_HISTORY_AWS):
         df_h = pd.read_csv(FILE_HISTORY_AWS)
         df_h['waktu'] = pd.to_datetime(df_h['waktu'])
-        df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end)]
+        df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end) & (df_h['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_h['waktu'], y=df_h['nilai'], name='AWS', line=dict(color='#1e40af', width=3)))
 
-    # --- REPLACEMENT FOR add_vline (TO AVOID SUM ERROR) ---
-    # 1. Garis (Shape)
+    # --- DATA PASAR IKAN (BPBD) ---
+    if os.path.exists(FILE_HISTORY_BPBD):
+        df_hb = pd.read_csv(FILE_HISTORY_BPBD)
+        df_hb['waktu'] = pd.to_datetime(df_hb['waktu'])
+        df_hb = df_hb[(df_hb['waktu'] >= t_start) & (df_hb['waktu'] <= t_end) & (df_hb['nilai'] <= LIMIT_SENSOR_ERROR)]
+        fig.add_trace(go.Scatter(x=df_hb['waktu'], y=df_hb['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
+
+    # --- SINKRONISASI GARIS WAKTU SEKARANG (METODE ANTI-ERROR) ---
+    # Pakai Shape biar gak TypeError sum()
     fig.add_shape(
         type="line", x0=sekarang, x1=sekarang, y0=0, y1=1,
         yref="paper", line=dict(color="#10b981", width=2, dash="dot")
     )
-    # 2. Label (Annotation)
+    # Pakai Annotation buat labelnya
     fig.add_annotation(
         x=sekarang, y=1, yref="paper",
         text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})",
         showarrow=False, font=dict(size=10, color="#10b981"),
         bgcolor="white", yanchor="bottom"
     )
-    
-    # Rob Lines
+
     fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ef4444", annotation_text="🔴 AWAS ROB")
     fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA ROB")
     
@@ -205,11 +214,17 @@ if df_pred is not None:
                       legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # --- FOOTER ---
+    # --- 8. FOOTER ---
     st.divider()
     st.caption(f"Update: {sekarang.strftime('%H:%M:%S')} WIB")
-    if st.button("🔄 Refresh Data", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+    f_col = st.columns(3)
+    with f_col[0]: 
+        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 AWS", open(FILE_HISTORY_AWS, "rb"), "aws.csv", use_container_width=True)
+    with f_col[1]: 
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd.csv", use_container_width=True)
+    with f_col[2]: 
+        if st.button("🔄 Refresh", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
 
     st.markdown('<div style="text-align: center; color: #64748b; font-size: 10px; font-weight: bold; margin-top: 10px;">© 2026 BMKG Maritim Tanjung Priok</div>', unsafe_allow_html=True)

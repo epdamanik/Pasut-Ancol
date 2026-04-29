@@ -234,8 +234,8 @@ if df_pred is not None:
     )
     
     # Garis Horizontal (Rob)
-    fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ef4444", annotation_text="🔴 AWAS")
-    fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA")
+    fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ef4444", annotation_text="🔴 AWAS ROB")
+    fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA ROB")
     
     fig.update_layout(
         height=400, template="plotly_white", yaxis_range=[1.3, 3.0], 

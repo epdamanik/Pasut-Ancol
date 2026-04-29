@@ -45,7 +45,6 @@ st.markdown("""
 
 # --- 2. LOGIC WAKTU (FORCE ASIA/JAKARTA) ---
 tz_jkt = pytz.timezone('Asia/Jakarta')
-# Menggunakan replace(tzinfo=None) agar kompatibel dengan data Excel/CSV yang biasanya naive datetime
 sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
 
 # --- 3. SIDEBAR ---
@@ -195,16 +194,17 @@ if df_pred is not None:
         df_hb = df_hb[(df_hb['waktu'] >= t_start) & (df_hb['waktu'] <= t_end) & (df_hb['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_hb['waktu'], y=df_hb['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
 
-    # --- BAGIAN PERBAIKAN GARIS VERTIKAL (x=sekarang.isoformat()) ---
+    # --- FIX FINAL: MENGGUNAKAN INTEGER TIMESTAMP UNTUK MENCEGAH TYPEERROR SUM() ---
+    ts_now = int(sekarang.timestamp() * 1000)
     fig.add_vline(
-        x=sekarang.isoformat(), 
+        x=ts_now, 
         line_dash="dot", line_color="#10b981", line_width=2,
         annotation_text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})", 
         annotation_position="top",
         annotation_font_size=10, annotation_font_color="#10b981", annotation_bgcolor="white"
     )
     
-    # Garis Horizontal (Rob)
+    # Garis Horizontal
     fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ef4444", annotation_text="🔴 AWAS ROB")
     fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA ROB")
     

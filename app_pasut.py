@@ -82,19 +82,30 @@ LIMIT_SENSOR_ERROR = 3.5
 def save_to_csv(filename, waktu, nilai):
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
     
-    # LOGIKA KHUSUS PASAR IKAN (Hanya simpan di menit 30 untuk data Jam X)
+    # 1. TENTUKAN TARGET TIMESTAMP
     if "bpbd" in filename.lower():
-        if waktu.minute == 30:
+        # LOGIKA KHUSUS PASAR IKAN: Hanya simpan kalau web udah rilis data baru (menit >= 30)
+        if waktu.minute >= 30:
             waktu_fixed = waktu.replace(minute=0, second=0, microsecond=0)
             waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
         else:
-            return
-    # LOGIKA AWS (Tetap per 15 menit)
+            return # Belum jam X:30, jangan simpan dulu
     else:
+        # LOGIKA AWS: Tetap per 15 menit
         menit_bulat = (waktu.minute // 15) * 15
         waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
         waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
 
+    # 2. CEK DUPLIKASI (Supaya gak nyatet berkali-kali)
+    if os.path.exists(filename):
+        try:
+            old_data_check = pd.read_csv(filename)
+            if waktu_str in old_data_check['waktu'].values:
+                return # Sudah ada data di jam ini, stop proses!
+        except: 
+            pass
+
+    # 3. SIMPAN DATA
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     if not os.path.exists(filename):
         new_data.to_csv(filename, index=False)
@@ -166,12 +177,12 @@ save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
-    # Summary Box
+    # Summary Box (Hanya untuk Teks Hari Ini)
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         i_max, i_min = df_h[col_val].idxmax(), df_h[col_val].idxmin()
         
-        # Ambil nilai dan jam untuk Max/Min
+        # Ambil nilai dan jam untuk Max/Min hari ini (buat Teks di Summary Box)
         val_max = df_h.loc[i_max, col_val]
         jam_max = df_h.loc[i_max, col_tgl].strftime("%H:%M")
         
@@ -195,18 +206,19 @@ if df_pred is not None:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
     
-    # --- TAMBAHAN: Titik Max & Min Harian di Grafik ---
+    # --- TAMBAHAN: Titik Max & Min SETIAP HARI di Grafik ---
     if not df_plot.empty:
+        # Cari index nilai max dan min untuk "setiap hari" di df_plot
         idx_daily_max = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmax()
         idx_daily_min = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmin()
 
         df_max = df_plot.loc[idx_daily_max]
         df_min = df_plot.loc[idx_daily_min]
 
-        # Plot titik Max
+        # Plot titik Max untuk Setiap Hari
         fig.add_trace(go.Scatter(
             x=df_max[col_tgl], y=df_max[col_val], 
-            mode='markers+text', name='Max Prediksi',
+            mode='markers+text', name='Max Harian',
             marker=dict(color='#ef4444', size=10, symbol='triangle-up'),
             text=[f"{v:.2f}m" for v in df_max[col_val]],
             textposition="top center",
@@ -214,17 +226,17 @@ if df_pred is not None:
             showlegend=False
         ))
 
-        # Plot titik Min
+        # Plot titik Min untuk Setiap Hari
         fig.add_trace(go.Scatter(
             x=df_min[col_tgl], y=df_min[col_val], 
-            mode='markers+text', name='Min Prediksi',
+            mode='markers+text', name='Min Harian',
             marker=dict(color='#3b82f6', size=10, symbol='triangle-down'),
             text=[f"{v:.2f}m" for v in df_min[col_val]],
             textposition="bottom center",
             textfont=dict(color='#3b82f6', size=11, family="Arial Black"),
             showlegend=False
         ))
-    # --------------------------------------------------
+    # ------------------------------------------------------
 
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])

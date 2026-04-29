@@ -26,7 +26,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     
-    /* Perbaikan visual Metric */
+    /* --- Perbaikan Visual Metric --- */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; height: 2.5rem !important; overflow: hidden !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     
@@ -38,16 +38,7 @@ st.markdown("""
         display: flex !important; flex-direction: column !important; justify-content: center !important;
     }
 
-    /* Logo Center Fix */
-    .logo-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        margin-bottom: 10px;
-    }
-
-    /* Summary Box tebal di Desktop & HP */
+    /* --- Perbaikan Summary Box (Tebal & Center) --- */
     .summary-box {
         background-color: #f1f5f9 !important; 
         padding: 12px !important; 
@@ -56,15 +47,17 @@ st.markdown("""
         border-left: 5px solid #1e3a8a !important;
         color: #0f172a !important;
         opacity: 1 !important;
+        text-align: center !important; /* Center text */
     }
     .summary-text {
         font-weight: 800 !important;
         font-size: 0.9rem !important;
         line-height: 1.4 !important;
         color: #0f172a !important;
-        display: block !important;
+        display: inline-block !important; /* Biar center-nya pas */
     }
 
+    /* --- RESPONSIVE MOBILE FIX --- */
     @media (max-width: 768px) {
         div[data-testid="stMetric"] { min-height: 110px !important; max-height: 110px !important; margin-bottom: 10px !important; }
         [data-testid="stMetricValue"] { font-size: 20px !important; }
@@ -84,26 +77,26 @@ with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
 
-# --- 4. HEADER (Logo & Judul) ---
-# FIX LOGO CENTER: Kita tidak pakai st.columns lagi untuk logo
+# --- 4. HEADER (LOGO & JUDUL - FULL FIX CENTER) ---
+# Kita tidak pakai st.columns atau st.image sama sekali di sini
+# Kita pakai HTML murni yang di-render lewat st.markdown untuk centering absolut
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
-if os.path.exists(NAMA_FILE_LOGO):
-    st.markdown(f"""
-        <div class="logo-container">
-            <img src="data:image/png;base64,{st.image(NAMA_FILE_LOGO, width=80)}" style="display:none;">
-        </div>
-        """, unsafe_allow_html=True)
-    # Cara Streamlit yang paling stabil buat centering image:
-    col_l, col_m, col_r = st.columns([2, 1, 2])
-    with col_m:
-        st.image(NAMA_FILE_LOGO, width=80)
 
-st.markdown(f"""
-    <div style="text-align: center; margin-top: -10px;">
-        <h2 style="margin-bottom: 0px; color: #0f172a; font-weight: bold; font-size: 1.5rem;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
-        <p style="color: #1e40af; font-weight: 700; margin-top: 0px;">Monitoring Water Level Real-Time</p>
+header_html = f"""
+    <div style="text-align: center; width: 100%; margin-bottom: 10px;">
+"""
+
+if os.path.exists(NAMA_FILE_LOGO):
+    # Kita pakai tag img HTML biasa, gampang di-center-in
+    header_html += f'<img src="./app/static/{NAMA_FILE_LOGO}" width="80" style="margin: auto; display: block; margin-bottom: 10px;">'
+
+header_html += f"""
+        <h2 style="margin-bottom: 0px; color: #0f172a; font-weight: bold; font-size: 1.5rem; line-height: 1.2;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
+        <p style="color: #1e40af; font-weight: 700; margin-top: 5px;">Monitoring Water Level Real-Time</p>
     </div>
-    """, unsafe_allow_html=True)
+"""
+
+st.markdown(header_html, unsafe_allow_html=True)
 st.divider()
 
 # --- 5. DATA FUNCTIONS ---
@@ -188,13 +181,13 @@ save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
-    # Summary Box (Mobile Optimized & Centered Text)
+    # Summary Box
     df_hari_ini = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_hari_ini.empty:
         idx_max, idx_min = df_hari_ini[col_val].idxmax(), df_hari_ini[col_val].idxmin()
         st.markdown(f"""
         <div class="summary-box">
-            <span class="summary-text" style="text-align: center;">
+            <span class="summary-text">
                 📅 {sekarang.strftime('%d %b %Y')} | 
                 <span style="color: #ef4444;">▲ MAX: {df_hari_ini.loc[idx_max, col_val]:.2f}m ({df_hari_ini.loc[idx_max, col_tgl].strftime('%H:%M')})</span> | 
                 <span style="color: #3b82f6;">▼ MIN: {df_hari_ini.loc[idx_min, col_val]:.2f}m ({df_hari_ini.loc[idx_min, col_tgl].strftime('%H:%M')})</span>
@@ -216,62 +209,40 @@ if df_pred is not None:
                     delta=f"{live_data['bpbd'] - h_pred:+.2f} m" if live_data["bpbd"] else None, delta_color="inverse")
     m_col[3].metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
 
-    # Chart Section
+    # Chart Configuration
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # Trace 1: Prediksi
+    # Trace Prediksi, AWS, BPBD (Sama seperti sebelumnya)
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='rgba(15, 23, 42, 0.2)', width=2)))
     
-    # Trace 2: History AWS
     if os.path.exists(FILE_HISTORY_AWS):
         df_h = pd.read_csv(FILE_HISTORY_AWS)
         df_h['waktu'] = pd.to_datetime(df_h['waktu'])
         df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end) & (df_h['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_h['waktu'], y=df_h['nilai'], name='AWS Priok', line=dict(color='#1e40af', width=3)))
 
-    # Trace 3: History Pasar Ikan (BPBD)
     if os.path.exists(FILE_HISTORY_BPBD):
         df_hb = pd.read_csv(FILE_HISTORY_BPBD)
         df_hb['waktu'] = pd.to_datetime(df_hb['waktu'])
         df_hb = df_hb[(df_hb['waktu'] >= t_start) & (df_hb['waktu'] <= t_end) & (df_hb['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_hb['waktu'], y=df_hb['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
 
-    # --- SINKRONISASI GARIS WAKTU SEKARANG ---
-    fig.add_shape(
-        type="line", x0=sekarang, x1=sekarang, y0=0, y1=1,
-        yref="paper", line=dict(color="#10b981", width=2, dash="dot")
-    )
-    fig.add_annotation(
-        x=sekarang, y=1, yref="paper",
-        text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})",
-        showarrow=False, font=dict(size=10, color="#10b981"),
-        bgcolor="white", yanchor="bottom"
-    )
-
-    # --- ROB LINES ---
+    # Garis Waktu Sekarang, Rob, Spikelines, Layout (Sama seperti sebelumnya)
+    fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#10b981", width=2, dash="dot"))
+    fig.add_annotation(x=sekarang, y=1, yref="paper", text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})", showarrow=False, font=dict(size=10, color="#10b981"), bgcolor="white", yanchor="bottom")
     fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ef4444", annotation_text="🔴 AWAS ROB")
     fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA ROB")
-    
-    # --- SPIKELINES & HOVER ---
     fig.update_xaxes(showspikes=True, spikemode="across", spikethickness=1, spikedash="dash", spikecolor="#64748b")
     fig.update_yaxes(showspikes=True, spikemode="across", spikethickness=1, spikedash="dash", spikecolor="#64748b")
-
-    fig.update_layout(
-        height=450, 
-        template="plotly_white", 
-        yaxis_range=[1.3, 3.0], 
-        margin=dict(l=10, r=10, t=30, b=10),
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
+    fig.update_layout(height=450, template="plotly_white", yaxis_range=[1.3, 3.0], margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     # --- 8. FOOTER & DOWNLOAD ---
     st.divider()
-    st.caption(f"Update Terakhir: {sekarang.strftime('%H:%M:%S')} WIB")
+    st.caption(f"Update: {sekarang.strftime('%H:%M:%S')} WIB")
     f_col = st.columns(3)
     with f_col[0]: 
         if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Data AWS", open(FILE_HISTORY_AWS, "rb"), "aws_priok.csv", use_container_width=True)

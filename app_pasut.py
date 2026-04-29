@@ -170,7 +170,15 @@ if df_pred is not None:
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         i_max, i_min = df_h[col_val].idxmax(), df_h[col_val].idxmin()
-        st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {df_h.loc[i_max, col_val]:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {df_h.loc[i_min, col_val]:.2f}m</span></span></div>', unsafe_allow_html=True)
+        
+        # Ambil nilai dan jam untuk Max/Min
+        val_max = df_h.loc[i_max, col_val]
+        jam_max = df_h.loc[i_max, col_tgl].strftime("%H:%M")
+        
+        val_min = df_h.loc[i_min, col_val]
+        jam_min = df_h.loc[i_min, col_tgl].strftime("%H:%M")
+        
+        st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {val_max:.2f}m ({jam_max} WIB)</span> | <span style="color: #3b82f6;">▼ MIN: {val_min:.2f}m ({jam_min} WIB)</span></span></div>', unsafe_allow_html=True)
 
     # Metrics
     m_col = st.columns(4)
@@ -187,6 +195,37 @@ if df_pred is not None:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
     
+    # --- TAMBAHAN: Titik Max & Min Harian di Grafik ---
+    if not df_plot.empty:
+        idx_daily_max = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmax()
+        idx_daily_min = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmin()
+
+        df_max = df_plot.loc[idx_daily_max]
+        df_min = df_plot.loc[idx_daily_min]
+
+        # Plot titik Max
+        fig.add_trace(go.Scatter(
+            x=df_max[col_tgl], y=df_max[col_val], 
+            mode='markers+text', name='Max Prediksi',
+            marker=dict(color='#ef4444', size=10, symbol='triangle-up'),
+            text=[f"{v:.2f}m" for v in df_max[col_val]],
+            textposition="top center",
+            textfont=dict(color='#ef4444', size=11, family="Arial Black"),
+            showlegend=False
+        ))
+
+        # Plot titik Min
+        fig.add_trace(go.Scatter(
+            x=df_min[col_tgl], y=df_min[col_val], 
+            mode='markers+text', name='Min Prediksi',
+            marker=dict(color='#3b82f6', size=10, symbol='triangle-down'),
+            text=[f"{v:.2f}m" for v in df_min[col_val]],
+            textposition="bottom center",
+            textfont=dict(color='#3b82f6', size=11, family="Arial Black"),
+            showlegend=False
+        ))
+    # --------------------------------------------------
+
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)]

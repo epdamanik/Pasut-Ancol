@@ -16,9 +16,39 @@ st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_
 
 st.markdown("""
     <style>
+    /* Background aplikasi tetap putih */
     .stApp { background-color: #ffffff; }
-    [data-testid="stMetricValue"] { font-size: 26px; font-weight: 800; color: #000; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 12px; border: 2px solid #e0e0e0; }
+
+    /* MENGATUR LABEL (TULISAN KECIL DI ATAS ANGKA) agar hitam tegas & tidak transparan */
+    [data-testid="stMetricLabel"] {
+        opacity: 1 !important;
+        color: #000000 !important;
+        font-weight: 700 !important;
+    }
+
+    /* Mengatur angka utama agar hitam pekat */
+    [data-testid="stMetricValue"] {
+        font-size: 26px;
+        font-weight: 800;
+        color: #000000 !important;
+    }
+
+    /* Box metric agar lebih kontras di HP */
+    .stMetric {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 12px;
+        border: 2px solid #e0e0e0;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+    }
+
+    /* Khusus untuk tampilan mobile agar font tidak mengecil otomatis secara ekstrem */
+    @media (max-width: 640px) {
+        [data-testid="stMetricValue"] {
+            font-size: 22px !important;
+        }
+    }
+
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)

@@ -68,7 +68,7 @@ with c2:
 st.markdown(f"""
     <div class="header-text">
         <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.5rem;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
-        <p style="color: #1e40af; font-weight: 700; margin-top: 5px;">Monitoring Water Level Real-Time</p>
+        <p style="color: #1e40af; font-weight: 700; margin-top: 5px;">Monitoring Tinggi Muka Air (TMA) Real-Time</p>
     </div>
     """, unsafe_allow_html=True)
 st.divider()

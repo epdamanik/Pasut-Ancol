@@ -2,6 +2,7 @@ streamlit
 pandas
 plotly
 openpyxl
-streamlit-autorefresh
+pytz
 selenium
 webdriver-manager
+streamlit-autorefresh

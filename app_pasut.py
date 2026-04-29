@@ -26,21 +26,15 @@ st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     
-    /* --- Fix Logo & Header Center --- */
-    .header-container {
+    /* --- CSS UNTUK LOGO CENTER HARGA MATI --- */
+    .flex-container {
         display: flex;
-        flex-direction: column;
-        align-items: center;
         justify-content: center;
-        text-align: center;
+        align-items: center;
         width: 100%;
     }
-    .logo-img {
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
-        width: 100px;
-    }
+    
+    .header-text { text-align: center; width: 100%; }
 
     /* Metric Styling */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
@@ -86,19 +80,15 @@ with st.sidebar:
 # --- 4. HEADER (LOGO & JUDUL) ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
 
-# Menggunakan container div agar simetris sempurna
-st.markdown('<div class="header-container">', unsafe_allow_html=True)
-if os.path.exists(NAMA_FILE_LOGO):
-    # Kita panggil st.image di dalam kolom tengah yang sangat sempit agar centeringnya kuat
-    _, col_center, _ = st.columns([2.2, 1, 2.2])
-    with col_center:
-        st.image(NAMA_FILE_LOGO, width=100)
-else:
-    st.write("Logo tidak ditemukan")
+# Trik Centering Baru: Pake 1 kolom kosong besar di kiri-kanan
+c1, c2, c3 = st.columns([1, 0.4, 1])
+with c2:
+    if os.path.exists(NAMA_FILE_LOGO):
+        st.image(NAMA_FILE_LOGO, use_container_width=True)
 
 st.markdown(f"""
-    <div class="header-container">
-        <h2 style="margin-bottom: 0px; color: #0f172a; font-weight: bold; font-size: 1.5rem;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
+    <div class="header-text">
+        <h2 style="margin-bottom: 0px; color: #0f172a; font-weight: bold; font-size: 1.5rem; line-height: 1.2;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
         <p style="color: #1e40af; font-weight: 700; margin-top: 5px;">Monitoring Water Level Real-Time</p>
     </div>
     """, unsafe_allow_html=True)
@@ -188,45 +178,46 @@ if df_pred is not None:
         i_max, i_min = df_h[col_val].idxmax(), df_h[col_val].idxmin()
         st.markdown(f"""
         <div class="summary-box">
-            <span class="summary-text">
-                📅 {sekarang.strftime('%d %b %Y')} | 
-                <span style="color: #ef4444;">▲ MAX: {df_h.loc[i_max, col_val]:.2f}m</span> | 
-                <span style="color: #3b82f6;">▼ MIN: {df_h.loc[i_min, col_val]:.2f}m</span>
-            </span>
+            <span class="summary-text">📅 {sekarang.strftime('%d %b %Y')} | <span style="color: #ef4444;">▲ MAX: {df_h.loc[i_max, col_val]:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {df_h.loc[i_min, col_val]:.2f}m</span></span>
         </div>
         """, unsafe_allow_html=True)
 
     # Metrics
     m_col = st.columns(4)
-    h_pred = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
-    m_col[0].metric("Prediksi", f"{h_pred:.2f} m")
+    h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
+    m_col[0].metric("Prediksi", f"{h_now:.2f} m")
     m_col[1].metric("AWS Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A")
     m_col[2].metric("BPBD Psr Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A")
-    m_col[3].metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] - h_pred) > 0.05 else "📉 SURUT")
+    m_col[3].metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] - h_now) > 0.05 else "📉 SURUT")
 
-    # Chart Section
+    # Chart
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # Prediksi - Dibuat Lebih Solid untuk Mobile
+    # Trace 1: Prediksi (Abu-abu gelap solid agar tidak pudar)
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
-    fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='#94a3b8', width=2.5)))
+    fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='#475569', width=2)))
     
+    # Trace 2: AWS Priok (Biru Tua)
     if os.path.exists(FILE_HISTORY_AWS):
-        dh_aws = pd.read_csv(FILE_HISTORY_AWS)
-        dh_aws['waktu'] = pd.to_datetime(dh_aws['waktu'])
-        dh_aws = dh_aws[(dh_aws['waktu'] >= t_start) & (dh_aws['waktu'] <= t_end)]
-        fig.add_trace(go.Scatter(x=dh_aws['waktu'], y=dh_aws['nilai'], name='AWS Priok', line=dict(color='#1e40af', width=3)))
+        dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
+        dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end)]
+        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Priok', line=dict(color='#1e40af', width=3)))
 
+    # Trace 3: Psr Ikan (Orange/Amber - Ganti dari Hijau)
     if os.path.exists(FILE_HISTORY_BPBD):
-        dh_bpbd = pd.read_csv(FILE_HISTORY_BPBD)
-        dh_bpbd['waktu'] = pd.to_datetime(dh_bpbd['waktu'])
-        dh_bpbd = dh_bpbd[(dh_bpbd['waktu'] >= t_start) & (dh_bpbd['waktu'] <= t_end)]
-        fig.add_trace(go.Scatter(x=dh_bpbd['waktu'], y=dh_bpbd['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
+        dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
+        dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end)]
+        fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Psr Ikan', line=dict(color='#f59e0b', width=3)))
 
-    fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#10b981", width=2, dash="dot"))
-    fig.update_layout(height=450, template="plotly_white", hovermode="x unified", legend=dict(orientation="h", y=1.1, x=1, xanchor="right"))
+    # Garis Waktu Sekarang (Tetap Hijau Terang)
+    fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=2.5, dash="dot"))
     
+    # Rob Lines
+    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS ROB")
+    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="WASPADA")
+
+    fig.update_layout(height=450, template="plotly_white", hovermode="x unified", legend=dict(orientation="h", y=1.1, x=1, xanchor="right"), margin=dict(l=10, r=10, t=30, b=10))
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     # Footer

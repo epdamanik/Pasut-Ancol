@@ -172,33 +172,33 @@ if df_pred is not None:
                     delta=f"{live_data['bpbd'] - h_pred:+.2f} m" if live_data["bpbd"] else None, delta_color="inverse")
     m_col[3].metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
 
-    # Chart
+    # --- CHART SECTION ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
+    # 1. Trace Prediksi
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='rgba(15, 23, 42, 0.2)', width=2)))
     
+    # 2. Trace AWS
     if os.path.exists(FILE_HISTORY_AWS):
         df_h = pd.read_csv(FILE_HISTORY_AWS)
         df_h['waktu'] = pd.to_datetime(df_h['waktu'])
         df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end) & (df_h['nilai'] <= LIMIT_SENSOR_ERROR)]
-        fig.add_trace(go.Scatter(x=df_h['waktu'], y=df_h['nilai'], name='AWS', line=dict(color='#1e40af', width=3)))
+        fig.add_trace(go.Scatter(x=df_h['waktu'], y=df_h['nilai'], name='AWS Priok', line=dict(color='#1e40af', width=3)))
 
-    # --- DATA PASAR IKAN (BPBD) ---
+    # 3. Trace Pasar Ikan (BPBD)
     if os.path.exists(FILE_HISTORY_BPBD):
         df_hb = pd.read_csv(FILE_HISTORY_BPBD)
         df_hb['waktu'] = pd.to_datetime(df_hb['waktu'])
         df_hb = df_hb[(df_hb['waktu'] >= t_start) & (df_hb['waktu'] <= t_end) & (df_hb['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_hb['waktu'], y=df_hb['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
 
-    # --- SINKRONISASI GARIS WAKTU SEKARANG (METODE ANTI-ERROR) ---
-    # Pakai Shape biar gak TypeError sum()
+    # --- GARIS WAKTU SEKARANG ---
     fig.add_shape(
         type="line", x0=sekarang, x1=sekarang, y0=0, y1=1,
         yref="paper", line=dict(color="#10b981", width=2, dash="dot")
     )
-    # Pakai Annotation buat labelnya
     fig.add_annotation(
         x=sekarang, y=1, yref="paper",
         text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})",
@@ -206,12 +206,29 @@ if df_pred is not None:
         bgcolor="white", yanchor="bottom"
     )
 
+    # --- ROB LINES ---
     fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ef4444", annotation_text="🔴 AWAS ROB")
     fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA ROB")
     
-    fig.update_layout(height=400, template="plotly_white", yaxis_range=[1.3, 3.0], 
-                      margin=dict(l=10, r=10, t=30, b=10),
-                      legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+    # --- INTERACTIVE SPIKELINES & LAYOUT ---
+    fig.update_xaxes(
+        showspikes=True, spikemode="across", spikethickness=1, 
+        spikedash="dash", spikecolor="#64748b"
+    )
+    fig.update_yaxes(
+        showspikes=True, spikemode="across", spikethickness=1, 
+        spikedash="dash", spikecolor="#64748b"
+    )
+
+    fig.update_layout(
+        height=450, 
+        template="plotly_white", 
+        yaxis_range=[1.3, 3.0], 
+        margin=dict(l=10, r=10, t=30, b=10),
+        hovermode="x unified", # Label gabungan saat hover
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     # --- 8. FOOTER ---
@@ -219,11 +236,11 @@ if df_pred is not None:
     st.caption(f"Update: {sekarang.strftime('%H:%M:%S')} WIB")
     f_col = st.columns(3)
     with f_col[0]: 
-        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 AWS", open(FILE_HISTORY_AWS, "rb"), "aws.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Data AWS", open(FILE_HISTORY_AWS, "rb"), "aws_priok.csv", use_container_width=True)
     with f_col[1]: 
-        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Data BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd_pasarikan.csv", use_container_width=True)
     with f_col[2]: 
-        if st.button("🔄 Refresh", use_container_width=True):
+        if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 

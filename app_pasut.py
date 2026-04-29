@@ -25,17 +25,8 @@ st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
-    
-    /* --- CSS UNTUK LOGO CENTER HARGA MATI --- */
-    .flex-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-    }
-    
     .header-text { text-align: center; width: 100%; }
-
+    
     /* Metric Styling */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
@@ -45,7 +36,7 @@ st.markdown("""
         border-left: 5px solid #1e40af !important; padding: 15px !important; border-radius: 10px !important;
     }
 
-    /* Summary Box Sharp */
+    /* Summary Box */
     .summary-box {
         background-color: #f1f5f9 !important; 
         padding: 12px !important; 
@@ -54,11 +45,7 @@ st.markdown("""
         border-left: 5px solid #1e3a8a !important;
         text-align: center !important;
     }
-    .summary-text {
-        font-weight: 850 !important;
-        font-size: 0.95rem !important;
-        color: #0f172a !important;
-    }
+    .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
 
     @media (max-width: 768px) {
         div[data-testid="stMetric"] { min-height: 110px !important; margin-bottom: 10px !important; }
@@ -80,7 +67,6 @@ with st.sidebar:
 # --- 4. HEADER (LOGO & JUDUL) ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
 
-# Trik Centering Baru: Pake 1 kolom kosong besar di kiri-kanan
 c1, c2, c3 = st.columns([1, 0.4, 1])
 with c2:
     if os.path.exists(NAMA_FILE_LOGO):
@@ -190,34 +176,57 @@ if df_pred is not None:
     m_col[2].metric("BPBD Psr Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A")
     m_col[3].metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] - h_now) > 0.05 else "📉 SURUT")
 
-    # Chart
+    # Chart Section
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # Trace 1: Prediksi (Abu-abu gelap solid agar tidak pudar)
+    # Trace 1: Prediksi (Abu-abu Gelap)
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
-    fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='#475569', width=2)))
+    fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
     
-    # Trace 2: AWS Priok (Biru Tua)
+    # Trace 2: AWS Priok (BIRU TEBAL + TITIK)
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end)]
-        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Priok', line=dict(color='#1e40af', width=3)))
+        fig.add_trace(go.Scatter(
+            x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Priok',
+            mode='lines+markers',
+            marker=dict(size=6, symbol='circle'),
+            line=dict(color='#0033cc', width=4)
+        ))
 
-    # Trace 3: Psr Ikan (Orange/Amber - Ganti dari Hijau)
+    # Trace 3: Psr Ikan (ORANGE TEBAL + TITIK)
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end)]
-        fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Psr Ikan', line=dict(color='#f59e0b', width=3)))
+        fig.add_trace(go.Scatter(
+            x=dh_b['waktu'], y=dh_b['nilai'], name='Psr Ikan',
+            mode='lines+markers',
+            marker=dict(size=6, symbol='diamond'),
+            line=dict(color='#f59e0b', width=4)
+        ))
 
-    # Garis Waktu Sekarang (Tetap Hijau Terang)
-    fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=2.5, dash="dot"))
+    # GARIS WAKTU SEKARANG + LABEL
+    fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=3, dash="dash"))
+    fig.add_annotation(
+        x=sekarang, y=1.05, yref="paper",
+        text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})",
+        showarrow=False, font=dict(size=12, color="#22c55e", font_weight="bold"),
+        bgcolor="white", bordercolor="#22c55e", borderwidth=1, borderpad=4, yanchor="bottom"
+    )
     
-    # Rob Lines
-    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS ROB")
+    # Rob Threshold Lines
+    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="BATAS AWAS ROB")
     fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="WASPADA")
 
-    fig.update_layout(height=450, template="plotly_white", hovermode="x unified", legend=dict(orientation="h", y=1.1, x=1, xanchor="right"), margin=dict(l=10, r=10, t=30, b=10))
+    fig.update_layout(
+        height=500, 
+        template="plotly_white", 
+        hovermode="x unified",
+        legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"),
+        margin=dict(l=10, r=10, t=60, b=10)
+    )
+    
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     # Footer

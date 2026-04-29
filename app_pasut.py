@@ -30,9 +30,23 @@ st.markdown("""
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     
+    /* FIX: Memaksa tinggi kotak sama (130px) agar seragam saat ada delta */
     div[data-testid="stMetric"] {
-        background-color: #f8fafc !important; border: 1px solid #e2e8f0 !important;
-        border-left: 5px solid #1e40af !important; padding: 15px !important; border-radius: 10px !important;
+        background-color: #f8fafc !important; 
+        border: 1px solid #e2e8f0 !important;
+        border-left: 5px solid #1e40af !important; 
+        padding: 15px !important; 
+        border-radius: 10px !important;
+        min-height: 130px !important; 
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    /* Styling teks delta/selisih */
+    [data-testid="stMetricDelta"] {
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
     }
 
     .summary-box {
@@ -43,7 +57,7 @@ st.markdown("""
     .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
 
     @media (max-width: 768px) {
-        div[data-testid="stMetric"] { min-height: 110px !important; margin-bottom: 10px !important; }
+        div[data-testid="stMetric"] { min-height: 140px !important; margin-bottom: 10px !important; }
     }
     footer {visibility: hidden;}
     </style>
@@ -98,8 +112,7 @@ def save_to_csv(filename, waktu, nilai):
             old_data_check = pd.read_csv(filename)
             if waktu_str in old_data_check['waktu'].values:
                 return 
-        except: 
-            pass
+        except: pass
 
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     if not os.path.exists(filename):
@@ -128,7 +141,6 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
-        # AWS Priok
         try:
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
@@ -136,7 +148,6 @@ def fetch_all_realtime():
             if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
         except: pass
         
-        # BPBD Pasar Ikan
         try:
             driver.get("https://bpbd.jakarta.go.id/waterlevel")
             time.sleep(3)
@@ -176,39 +187,27 @@ if df_pred is not None:
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         i_max, i_min = df_h[col_val].idxmax(), df_h[col_val].idxmin()
-        val_max = df_h.loc[i_max, col_val]
-        jam_max = df_h.loc[i_max, col_tgl].strftime("%H:%M")
-        val_min = df_h.loc[i_min, col_val]
-        jam_min = df_h.loc[i_min, col_tgl].strftime("%H:%M")
+        val_max, jam_max = df_h.loc[i_max, col_val], df_h.loc[i_max, col_tgl].strftime("%H:%M")
+        val_min, jam_min = df_h.loc[i_min, col_val], df_h.loc[i_min, col_tgl].strftime("%H:%M")
         st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {val_max:.2f}m ({jam_max} WIB)</span> | <span style="color: #3b82f6;">▼ MIN: {val_min:.2f}m ({jam_min} WIB)</span></span></div>', unsafe_allow_html=True)
 
-    # --- HITUNG SELISIH TERHADAP PREDIKSI ---
-    # Ambil nilai prediksi terdekat dengan waktu sekarang
+    # --- HITUNG SELISIH ---
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
     
-    # Selisih AWS
-    diff_aws = None
-    if live_data['aws'] is not None:
-        diff_aws = live_data['aws'] - h_now
+    diff_aws = (live_data['aws'] - h_now) if live_data['aws'] is not None else None
+    diff_bpbd = (live_data['bpbd'] - h_now) if live_data['bpbd'] is not None else None
 
-    # Selisih BPBD
-    diff_bpbd = None
-    if live_data['bpbd'] is not None:
-        diff_bpbd = live_data['bpbd'] - h_now
-
-    # Metrics Layout
+    # Metrics
     m_col = st.columns(4)
     m_col[0].metric("Prediksi (Model)", f"{h_now:.2f} m")
     
-    # Metric AWS + Delta Selisih
     m_col[1].metric(
         label="TMA AWS Tj. Priok", 
         value=f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A",
         delta=f"{diff_aws:+.2f} m dr prediksi" if diff_aws is not None else None,
-        delta_color="inverse" # Merah jika lebih tinggi (positif), Hijau jika lebih rendah
+        delta_color="inverse"
     )
     
-    # Metric BPBD + Delta Selisih
     m_col[2].metric(
         label="TMA Pintu Air Psr. Ikan", 
         value=f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A",
@@ -221,33 +220,20 @@ if df_pred is not None:
     # Chart
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
-    
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
     
     if not df_plot.empty:
         idx_daily_max = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmax()
         idx_daily_min = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmin()
-        df_max = df_plot.loc[idx_daily_max]
-        df_min = df_plot.loc[idx_daily_min]
-
-        fig.add_trace(go.Scatter(
-            x=df_max[col_tgl], y=df_max[col_val], mode='markers+text', name='Max Harian',
-            marker=dict(color='#ef4444', size=10, symbol='triangle-up'),
-            text=[f"{v:.2f}m" for v in df_max[col_val]], textposition="top center",
-            textfont=dict(color='#ef4444', size=11, family="Arial Black"), showlegend=False
-        ))
-        fig.add_trace(go.Scatter(
-            x=df_min[col_tgl], y=df_min[col_val], mode='markers+text', name='Min Harian',
-            marker=dict(color='#3b82f6', size=10, symbol='triangle-down'),
-            text=[f"{v:.2f}m" for v in df_min[col_val]], textposition="bottom center",
-            textfont=dict(color='#3b82f6', size=11, family="Arial Black"), showlegend=False
-        ))
+        for idxs, color, sym, pos in [(idx_daily_max, '#ef4444', 'triangle-up', 'top center'), (idx_daily_min, '#3b82f6', 'triangle-down', 'bottom center')]:
+            df_pts = df_plot.loc[idxs]
+            fig.add_trace(go.Scatter(x=df_pts[col_tgl], y=df_pts[col_val], mode='markers+text', marker=dict(color=color, size=10, symbol=sym), text=[f"{v:.2f}m" for v in df_pts[col_val]], textposition=pos, textfont=dict(color=color, size=11, family="Arial Black"), showlegend=False))
 
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)]
-        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Tj. Priok', mode='lines+markers', marker=dict(size=6), line=dict(color='#0033cc', width=4)))
+        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Tj. Priok', mode='lines+markers', line=dict(color='#0033cc', width=4)))
 
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
@@ -255,29 +241,18 @@ if df_pred is not None:
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Pintu air Psr. Ikan', mode='lines+markers', line=dict(color='#f59e0b', width=4)))
 
     fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=3, dash="dash"))
-    fig.add_annotation(
-        x=sekarang, y=1.05, yref="paper", text=f"<b>WAKTU SEKARANG ({sekarang.strftime('%H:%M')})</b>",
-        showarrow=False, font=dict(size=12, color="#22c55e"), bgcolor="white", bordercolor="#22c55e", borderwidth=1, borderpad=4, yanchor="bottom"
-    )
-    
-    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>", annotation_position="top left")
-    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>", annotation_position="bottom left")
+    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
+    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")
 
-    fig.update_layout(
-        height=500, template="plotly_white", hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="left", x=0),
-        margin=dict(l=10, r=10, t=60, b=100)
-    )
+    fig.update_layout(height=500, template="plotly_white", hovermode="x unified", legend=dict(orientation="h", y=-0.25, x=0), margin=dict(l=10, r=10, t=60, b=100))
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # --- 8. FOOTER & DOWNLOAD ---
+    # --- 8. FOOTER ---
     st.divider()
     f1, f2, f3 = st.columns(3)
     with f1:
-        if os.path.exists(FILE_HISTORY_AWS):
-            st.download_button("📥 Download AWS", open(FILE_HISTORY_AWS, 'rb'), "history_aws.csv", "text/csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Download AWS", open(FILE_HISTORY_AWS, 'rb'), "history_aws.csv", "text/csv", use_container_width=True)
     with f2:
-        if os.path.exists(FILE_HISTORY_BPBD):
-            st.download_button("📥 Download Psr. Ikan", open(FILE_HISTORY_BPBD, 'rb'), "history_bpbd.csv", "text/csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Download Psr. Ikan", open(FILE_HISTORY_BPBD, 'rb'), "history_bpbd.csv", "text/csv", use_container_width=True)
     with f3: 
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()

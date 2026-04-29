@@ -16,10 +16,10 @@ st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_
 
 st.markdown("""
     <style>
-    /* Background aplikasi tetap putih */
+    /* Background aplikasi */
     .stApp { background-color: #ffffff; }
-
-    /* MENGATUR LABEL (TULISAN KECIL DI ATAS ANGKA) agar hitam tegas & tidak transparan */
+    
+    /* FIX OPACITY: Memaksa label metric hitam pekat agar kelihatan di HP */
     [data-testid="stMetricLabel"] {
         opacity: 1 !important;
         color: #000000 !important;
@@ -33,7 +33,7 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* Box metric agar lebih kontras di HP */
+    /* Box metric agar lebih kontras */
     .stMetric {
         background-color: #ffffff;
         padding: 15px;
@@ -42,7 +42,7 @@ st.markdown("""
         box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
     }
 
-    /* Khusus untuk tampilan mobile agar font tidak mengecil otomatis secara ekstrem */
+    /* Responsivitas HP */
     @media (max-width: 640px) {
         [data-testid="stMetricValue"] {
             font-size: 22px !important;
@@ -57,6 +57,7 @@ st.markdown("""
 with st.sidebar:
     st.subheader("🗓️ Filter Waktu")
     sekarang = datetime.now()
+    # Penyesuaian timezone jika dideploy di cloud (Streamlit Cloud pake UTC)
     if os.name != 'nt': sekarang = sekarang + timedelta(hours=7)
 
     tgl_range = st.date_input(
@@ -229,7 +230,21 @@ if df_pred is not None:
                                  text=['HIGH', 'LOW'], textposition='top center', name='Daily H/L'))
 
     fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="#ff8c00", annotation_text="WASPADA ROB")
+    
+    # --- FIX AREA: GARIS WAKTU SEKARANG + LABEL ---
+    # Pakai vline tanpa annotation untuk garisnya
     fig.add_vline(x=sekarang, line_dash="dot", line_width=2, line_color="#008000")
+    
+    # Pakai add_annotation manual supaya tidak kena TypeError internal Plotly
+    fig.add_annotation(
+        x=sekarang,
+        y=1.05, # sedikit di atas grafik
+        yref="paper", 
+        text=f"Waktu Sekarang: {sekarang.strftime('%H:%M')}",
+        showarrow=False,
+        font=dict(color="#008000", size=12),
+        xanchor="left"
+    )
     
     fig.update_layout(height=550, template="plotly_white", margin=dict(l=10, r=10, t=75, b=10), hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)

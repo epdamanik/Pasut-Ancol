@@ -16,44 +16,37 @@ st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_
 
 st.markdown("""
     <style>
-    /* Background aplikasi */
     .stApp { background-color: #ffffff; }
     
-    /* FIX OPACITY & WARNA: Memaksa label metric hitam pekat agar kelihatan di HP */
+    /* Fix Opacity & Warna Label */
     [data-testid="stMetricLabel"] {
         opacity: 1 !important;
         color: #000000 !important;
         font-weight: 700 !important;
     }
 
-    /* Mengatur angka utama agar hitam pekat */
     [data-testid="stMetricValue"] {
         font-size: 26px;
         font-weight: 800;
         color: #000000 !important;
     }
 
-    /* FIX SIMETRIS: Menyamakan tinggi kotak metric agar estetik */
+    /* Fix Simetris Kotak */
     [data-testid="stMetric"] {
         background-color: #ffffff;
         padding: 15px;
         border-radius: 12px;
         border: 2px solid #e0e0e0;
         box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
-        min-height: 140px; /* Paksa tinggi minimal agar sama semua */
+        min-height: 140px;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
 
-    /* Responsivitas HP */
     @media (max-width: 640px) {
-        [data-testid="stMetricValue"] {
-            font-size: 22px !important;
-        }
-        [data-testid="stMetric"] {
-            min-height: 120px;
-        }
+        [data-testid="stMetricValue"] { font-size: 22px !important; }
+        [data-testid="stMetric"] { min-height: 120px; }
     }
 
     footer {visibility: hidden;}
@@ -71,7 +64,7 @@ with st.sidebar:
         value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2))
     )
     st.divider()
-    st.info("💡 Garis **Hijau** tegak lurus menunjukkan waktu saat ini.")
+    st.info("💡 Data dicatat otomatis setiap 15 menit ke dalam file history.")
 
 # --- 3. HEADER UTAMA ---
 h1, h2, h3, h4, h5 = st.columns([2, 1, 0.7, 1, 2])
@@ -165,42 +158,24 @@ if aws_val is not None:
 
 # --- 5. METRICS & GRAFIK ---
 if df_pred is not None:
-    # --- LOGIC RINGKASAN HARIAN ---
+    # Ringkasan Harian HTML Box
     df_hari_ini = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
-    
     if not df_hari_ini.empty:
         idx_max = df_hari_ini[col_val].idxmax()
-        w_max = df_hari_ini.loc[idx_max, col_tgl].strftime('%H:%M')
         v_max = f"{df_hari_ini.loc[idx_max, col_val]:.2f}"
-        
+        w_max = df_hari_ini.loc[idx_max, col_tgl].strftime('%H:%M')
         idx_min = df_hari_ini[col_val].idxmin()
-        w_min = df_hari_ini.loc[idx_min, col_tgl].strftime('%H:%M')
         v_min = f"{df_hari_ini.loc[idx_min, col_val]:.2f}"
+        w_min = df_hari_ini.loc[idx_min, col_tgl].strftime('%H:%M')
         
-        tgl_str = sekarang.strftime('%d %b %Y')
-
-        html_box = f"""
-        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e9ecef; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); color: #000000;">
-            <div style="font-weight: 700; font-size: 1.1rem; color: #004085; margin-bottom: 10px; border-bottom: 1px solid #dee2e6; padding-bottom: 8px;">
-                📝 Ringkasan Kondisi ({tgl_str})
-            </div>
-            <table style="width: 100%; border-collapse: collapse; font-size: 1.05rem; color: #000000;">
-                <tr style="height: 30px;">
-                    <td style="width: 145px; white-space: nowrap;">🚀 <b>Pasang Tertinggi</b></td>
-                    <td style="width: 10px; text-align: center;">:</td>
-                    <td style="color: #c00000; font-weight: 700; padding-left: 8px;">{w_max} WIB ({v_max} m)</td>
-                </tr>
-                <tr style="height: 30px;">
-                    <td style="white-space: nowrap;">📉 <b>Surut Terendah</b></td>
-                    <td style="text-align: center;">:</td>
-                    <td style="color: #007000; font-weight: 700; padding-left: 8px;">{w_min} WIB ({v_min} m)</td>
-                </tr>
-            </table>
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e9ecef; color: #000;">
+            <div style="font-weight: 700; color: #004085; border-bottom: 1px solid #dee2e6; padding-bottom: 8px; margin-bottom: 10px;">📝 Ringkasan Kondisi ({sekarang.strftime('%d %b %Y')})</div>
+            🚀 <b>Pasang Tertinggi:</b> <span style="color: #c00000;">{w_max} WIB ({v_max} m)</span> | 📉 <b>Surut Terendah:</b> <span style="color: #007000;">{w_min} WIB ({v_min} m)</span>
         </div>
-        """
-        st.markdown(html_box, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    # Metrics
+    # Metrics Logic
     idx_now = (df_pred[col_tgl] - sekarang).abs().idxmin()
     h_pred = df_pred.loc[idx_now, col_val]
     idx_nanti = (df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin()
@@ -212,56 +187,53 @@ if df_pred is not None:
 
     val_tampil = aws_val if aws_val else (df_hist['nilai'].iloc[-1] if not df_hist.empty else h_pred)
     
-    # Render Metrics
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Aktual (AWS)", f"{val_tampil:.2f} m", delta=f"{val_tampil - h_pred:.2f} m" if aws_val else None, delta_color="inverse")
     m2.metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
     m3.metric("Prediksi", f"{h_pred:.2f} m")
     m4.metric("Batas AWAS ROB", f"{BATAS_ROB_AWAS} m")
 
-    # Grafik
+    # Grafik Plotly
     t_start_view = datetime.combine(tgl_range[0], datetime.min.time())
     t_end_view = datetime.combine(tgl_range[1], datetime.max.time())
-
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start_view) & (df_pred[col_tgl] <= t_end_view)]
-    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], mode='lines', line=dict(color='rgba(0, 102, 204, 0.6)', width=2), name='Prediksi'))
-
+    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], mode='lines', line=dict(color='rgba(0, 102, 204, 0.4)', width=2), name='Prediksi'))
     if not df_hist.empty:
         hist_view = df_hist[(df_hist['waktu'] >= t_start_view) & (df_hist['waktu'] <= t_end_view)]
         fig.add_trace(go.Scatter(x=hist_view['waktu'], y=hist_view['nilai'], mode='lines', line=dict(color='#cc0000', width=3), name='Aktual'))
 
-    if not df_hari_ini.empty:
-        fig.add_trace(go.Scatter(x=[df_hari_ini.loc[idx_max, col_tgl], df_hari_ini.loc[idx_min, col_tgl]], 
-                                 y=[df_hari_ini.loc[idx_max, col_val], df_hari_ini.loc[idx_min, col_val]],
-                                 mode='markers+text', marker=dict(color=['#cc0000', '#004085'], size=12, symbol='diamond'),
-                                 text=['HIGH', 'LOW'], textposition='top center', name='Daily H/L'))
-
-    # GARIS BATAS ROB (AWAS & WASPADA)
     fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ff0000", annotation_text="🔴 AWAS ROB")
     fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#ffa500", annotation_text="🟠 WASPADA ROB")
-    
-    # GARIS WAKTU SEKARANG + LABEL
     fig.add_vline(x=sekarang, line_dash="dot", line_width=2, line_color="#008000")
-    fig.add_annotation(
-        x=sekarang,
-        y=1.05,
-        yref="paper", 
-        text=f"Waktu Sekarang: {sekarang.strftime('%H:%M')}",
-        showarrow=False,
-        font=dict(color="#008000", size=12),
-        xanchor="left"
-    )
+    fig.add_annotation(x=sekarang, y=1.05, yref="paper", text=f"Waktu Sekarang: {sekarang.strftime('%H:%M')}", showarrow=False, font=dict(color="#008000"), xanchor="left")
     
-    fig.update_layout(height=550, template="plotly_white", margin=dict(l=10, r=10, t=75, b=10), hovermode="x unified")
+    fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=50, b=10), hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- 6. FOOTER ---
+    # --- 6. FOOTER & DOWNLOAD AREA ---
     st.divider()
-    c1, c2 = st.columns([3, 1])
-    with c1: st.success(f"✅ SISTEM AKTIF | Update: {sekarang.strftime('%H:%M:%S')} WIB")
-    with c2: 
-        if st.button("🔄 Force Refresh"): st.cache_data.clear(); st.rerun()
+    col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
+    
+    with col_f1:
+        st.success(f"✅ SISTEM AKTIF | Update: {sekarang.strftime('%H:%M:%S')} WIB")
+    
+    with col_f2:
+        # FITUR DOWNLOAD DATA HISTORY
+        if os.path.exists(FILE_HISTORY):
+            with open(FILE_HISTORY, "rb") as file:
+                st.download_button(
+                    label="📥 Download Data History",
+                    data=file,
+                    file_name=f"history_aws_priok_{sekarang.strftime('%Y%m%d')}.csv",
+                    mime="text/csv",
+                    help="Klik untuk mendownload semua data rekaman AWS yang tersimpan"
+                )
+    
+    with col_f3:
+        if st.button("🔄 Force Refresh", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
 
     st.markdown(f'<div style="text-align: center; color: #333; font-size: 11px; font-weight: bold; margin-top: 20px;">© 2026 BMKG Maritim Tanjung Priok</div>', unsafe_allow_html=True)
 else:

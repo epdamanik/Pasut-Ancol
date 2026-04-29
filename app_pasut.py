@@ -25,8 +25,11 @@ st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
+    
+    /* Perbaikan visual Metric agar tajam */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; height: 2.5rem !important; overflow: hidden !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
+    
     div[data-testid="stMetric"] {
         background-color: #f8fafc !important; border: 1px solid #e2e8f0 !important;
         border-left: 5px solid #1e40af !important; padding: 15px !important; border-radius: 10px !important;
@@ -34,10 +37,30 @@ st.markdown("""
         min-height: 140px !important; max-height: 140px !important;
         display: flex !important; flex-direction: column !important; justify-content: center !important;
     }
+
+    /* Styling khusus Summary Box (Max/Min) agar tebal di Desktop & HP */
+    .summary-box {
+        background-color: #f1f5f9 !important; 
+        padding: 12px !important; 
+        border-radius: 10px !important; 
+        margin-bottom: 15px !important; 
+        border-left: 5px solid #1e3a8a !important;
+        color: #0f172a !important;
+        opacity: 1 !important;
+    }
+    .summary-text {
+        font-weight: 800 !important;
+        font-size: 0.9rem !important;
+        line-height: 1.4 !important;
+        color: #0f172a !important;
+        display: block !important;
+    }
+
     @media (max-width: 768px) {
         div[data-testid="stMetric"] { min-height: 110px !important; max-height: 110px !important; margin-bottom: 10px !important; }
         [data-testid="stMetricValue"] { font-size: 20px !important; }
         [data-testid="stMetricLabel"] { height: 2rem !important; font-size: 0.85rem !important; }
+        .summary-text { font-size: 0.8rem !important; }
     }
     footer {visibility: hidden;}
     </style>
@@ -148,13 +171,17 @@ save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
-    # Summary Box
+    # Summary Box (Mobile Optimized)
     df_hari_ini = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_hari_ini.empty:
         idx_max, idx_min = df_hari_ini[col_val].idxmax(), df_hari_ini[col_val].idxmin()
         st.markdown(f"""
-        <div style="background-color: #f1f5f9; padding: 10px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid #1e3a8a; font-size: 0.85rem;">
-            <b style="font-weight: 900;">{sekarang.strftime('%d %b %Y')}: Max {df_hari_ini.loc[idx_max, col_val]:.2f}m ({df_hari_ini.loc[idx_max, col_tgl].strftime('%H:%M')}) | Min {df_hari_ini.loc[idx_min, col_val]:.2f}m ({df_hari_ini.loc[idx_min, col_tgl].strftime('%H:%M')})</b>
+        <div class="summary-box">
+            <span class="summary-text">
+                📅 {sekarang.strftime('%d %b %Y')} | 
+                <span style="color: #ef4444;">▲ MAX: {df_hari_ini.loc[idx_max, col_val]:.2f}m ({df_hari_ini.loc[idx_max, col_tgl].strftime('%H:%M')})</span> | 
+                <span style="color: #3b82f6;">▼ MIN: {df_hari_ini.loc[idx_min, col_val]:.2f}m ({df_hari_ini.loc[idx_min, col_tgl].strftime('%H:%M')})</span>
+            </span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -172,29 +199,29 @@ if df_pred is not None:
                     delta=f"{live_data['bpbd'] - h_pred:+.2f} m" if live_data["bpbd"] else None, delta_color="inverse")
     m_col[3].metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
 
-    # --- CHART SECTION ---
+    # Chart Section
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # 1. Trace Prediksi
+    # Trace 1: Prediksi
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='rgba(15, 23, 42, 0.2)', width=2)))
     
-    # 2. Trace AWS
+    # Trace 2: History AWS
     if os.path.exists(FILE_HISTORY_AWS):
         df_h = pd.read_csv(FILE_HISTORY_AWS)
         df_h['waktu'] = pd.to_datetime(df_h['waktu'])
         df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end) & (df_h['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_h['waktu'], y=df_h['nilai'], name='AWS Priok', line=dict(color='#1e40af', width=3)))
 
-    # 3. Trace Pasar Ikan (BPBD)
+    # Trace 3: History Pasar Ikan (BPBD)
     if os.path.exists(FILE_HISTORY_BPBD):
         df_hb = pd.read_csv(FILE_HISTORY_BPBD)
         df_hb['waktu'] = pd.to_datetime(df_hb['waktu'])
         df_hb = df_hb[(df_hb['waktu'] >= t_start) & (df_hb['waktu'] <= t_end) & (df_hb['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_hb['waktu'], y=df_hb['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
 
-    # --- GARIS WAKTU SEKARANG ---
+    # --- SINKRONISASI GARIS WAKTU SEKARANG (ANTI-ERROR) ---
     fig.add_shape(
         type="line", x0=sekarang, x1=sekarang, y0=0, y1=1,
         yref="paper", line=dict(color="#10b981", width=2, dash="dot")
@@ -210,7 +237,7 @@ if df_pred is not None:
     fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ef4444", annotation_text="🔴 AWAS ROB")
     fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA ROB")
     
-    # --- INTERACTIVE SPIKELINES & LAYOUT ---
+    # --- SPIKELINES & HOVER ---
     fig.update_xaxes(
         showspikes=True, spikemode="across", spikethickness=1, 
         spikedash="dash", spikecolor="#64748b"
@@ -225,22 +252,24 @@ if df_pred is not None:
         template="plotly_white", 
         yaxis_range=[1.3, 3.0], 
         margin=dict(l=10, r=10, t=30, b=10),
-        hovermode="x unified", # Label gabungan saat hover
+        hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # --- 8. FOOTER ---
+    # --- 8. FOOTER & DOWNLOAD BUTTONS ---
     st.divider()
-    st.caption(f"Update: {sekarang.strftime('%H:%M:%S')} WIB")
+    st.caption(f"Update Terakhir: {sekarang.strftime('%H:%M:%S')} WIB")
     f_col = st.columns(3)
     with f_col[0]: 
-        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Data AWS", open(FILE_HISTORY_AWS, "rb"), "aws_priok.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_AWS): 
+            st.download_button("📥 Download Data AWS", open(FILE_HISTORY_AWS, "rb"), "aws_priok.csv", use_container_width=True)
     with f_col[1]: 
-        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Data BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd_pasarikan.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): 
+            st.download_button("📥 Download Data BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd_pasarikan.csv", use_container_width=True)
     with f_col[2]: 
-        if st.button("🔄 Refresh Data", use_container_width=True):
+        if st.button("🔄 Refresh Data Sekarang", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 

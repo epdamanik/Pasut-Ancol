@@ -26,7 +26,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     
-    /* Perbaikan visual Metric agar tajam */
+    /* Perbaikan visual Metric */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; height: 2.5rem !important; overflow: hidden !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     
@@ -38,7 +38,16 @@ st.markdown("""
         display: flex !important; flex-direction: column !important; justify-content: center !important;
     }
 
-    /* Styling khusus Summary Box (Max/Min) agar tebal di Desktop & HP */
+    /* Logo Center Fix */
+    .logo-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    /* Summary Box tebal di Desktop & HP */
     .summary-box {
         background-color: #f1f5f9 !important; 
         padding: 12px !important; 
@@ -75,11 +84,19 @@ with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
 
-# --- 4. HEADER ---
-h1, h2, h3, h4, h5 = st.columns([1, 1, 1, 1, 1])
+# --- 4. HEADER (Logo & Judul) ---
+# FIX LOGO CENTER: Kita tidak pakai st.columns lagi untuk logo
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
-with h3:
-    if os.path.exists(NAMA_FILE_LOGO): st.image(NAMA_FILE_LOGO, width=80)
+if os.path.exists(NAMA_FILE_LOGO):
+    st.markdown(f"""
+        <div class="logo-container">
+            <img src="data:image/png;base64,{st.image(NAMA_FILE_LOGO, width=80)}" style="display:none;">
+        </div>
+        """, unsafe_allow_html=True)
+    # Cara Streamlit yang paling stabil buat centering image:
+    col_l, col_m, col_r = st.columns([2, 1, 2])
+    with col_m:
+        st.image(NAMA_FILE_LOGO, width=80)
 
 st.markdown(f"""
     <div style="text-align: center; margin-top: -10px;">
@@ -171,13 +188,13 @@ save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
-    # Summary Box (Mobile Optimized)
+    # Summary Box (Mobile Optimized & Centered Text)
     df_hari_ini = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_hari_ini.empty:
         idx_max, idx_min = df_hari_ini[col_val].idxmax(), df_hari_ini[col_val].idxmin()
         st.markdown(f"""
         <div class="summary-box">
-            <span class="summary-text">
+            <span class="summary-text" style="text-align: center;">
                 📅 {sekarang.strftime('%d %b %Y')} | 
                 <span style="color: #ef4444;">▲ MAX: {df_hari_ini.loc[idx_max, col_val]:.2f}m ({df_hari_ini.loc[idx_max, col_tgl].strftime('%H:%M')})</span> | 
                 <span style="color: #3b82f6;">▼ MIN: {df_hari_ini.loc[idx_min, col_val]:.2f}m ({df_hari_ini.loc[idx_min, col_tgl].strftime('%H:%M')})</span>
@@ -221,7 +238,7 @@ if df_pred is not None:
         df_hb = df_hb[(df_hb['waktu'] >= t_start) & (df_hb['waktu'] <= t_end) & (df_hb['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_hb['waktu'], y=df_hb['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
 
-    # --- SINKRONISASI GARIS WAKTU SEKARANG (ANTI-ERROR) ---
+    # --- SINKRONISASI GARIS WAKTU SEKARANG ---
     fig.add_shape(
         type="line", x0=sekarang, x1=sekarang, y0=0, y1=1,
         yref="paper", line=dict(color="#10b981", width=2, dash="dot")
@@ -238,14 +255,8 @@ if df_pred is not None:
     fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA ROB")
     
     # --- SPIKELINES & HOVER ---
-    fig.update_xaxes(
-        showspikes=True, spikemode="across", spikethickness=1, 
-        spikedash="dash", spikecolor="#64748b"
-    )
-    fig.update_yaxes(
-        showspikes=True, spikemode="across", spikethickness=1, 
-        spikedash="dash", spikecolor="#64748b"
-    )
+    fig.update_xaxes(showspikes=True, spikemode="across", spikethickness=1, spikedash="dash", spikecolor="#64748b")
+    fig.update_yaxes(showspikes=True, spikemode="across", spikethickness=1, spikedash="dash", spikecolor="#64748b")
 
     fig.update_layout(
         height=450, 
@@ -258,18 +269,16 @@ if df_pred is not None:
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # --- 8. FOOTER & DOWNLOAD BUTTONS ---
+    # --- 8. FOOTER & DOWNLOAD ---
     st.divider()
     st.caption(f"Update Terakhir: {sekarang.strftime('%H:%M:%S')} WIB")
     f_col = st.columns(3)
     with f_col[0]: 
-        if os.path.exists(FILE_HISTORY_AWS): 
-            st.download_button("📥 Download Data AWS", open(FILE_HISTORY_AWS, "rb"), "aws_priok.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Data AWS", open(FILE_HISTORY_AWS, "rb"), "aws_priok.csv", use_container_width=True)
     with f_col[1]: 
-        if os.path.exists(FILE_HISTORY_BPBD): 
-            st.download_button("📥 Download Data BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd_pasarikan.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Data BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd_pasarikan.csv", use_container_width=True)
     with f_col[2]: 
-        if st.button("🔄 Refresh Data Sekarang", use_container_width=True):
+        if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 

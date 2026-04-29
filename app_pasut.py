@@ -207,4 +207,3 @@ if df_pred is not None:
     f_col = st.columns(3)
     with f_col[2]: 
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
-            

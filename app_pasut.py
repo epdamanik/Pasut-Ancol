@@ -26,9 +26,22 @@ st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     
-    /* Center Judul & Subjudul */
-    .header-text { text-align: center; width: 100%; }
-    
+    /* --- Fix Logo & Header Center --- */
+    .header-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        width: 100%;
+    }
+    .logo-img {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        width: 100px;
+    }
+
     /* Metric Styling */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
@@ -38,7 +51,7 @@ st.markdown("""
         border-left: 5px solid #1e40af !important; padding: 15px !important; border-radius: 10px !important;
     }
 
-    /* Summary Box Sharp & Thick */
+    /* Summary Box Sharp */
     .summary-box {
         background-color: #f1f5f9 !important; 
         padding: 12px !important; 
@@ -51,7 +64,6 @@ st.markdown("""
         font-weight: 850 !important;
         font-size: 0.95rem !important;
         color: #0f172a !important;
-        opacity: 1 !important;
     }
 
     @media (max-width: 768px) {
@@ -74,14 +86,18 @@ with st.sidebar:
 # --- 4. HEADER (LOGO & JUDUL) ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
 
-# Centering Logo pake Columns (Cara paling aman di Streamlit)
-col1, col2, col3 = st.columns([2, 1, 2])
-with col2:
-    if os.path.exists(NAMA_FILE_LOGO):
+# Menggunakan container div agar simetris sempurna
+st.markdown('<div class="header-container">', unsafe_allow_html=True)
+if os.path.exists(NAMA_FILE_LOGO):
+    # Kita panggil st.image di dalam kolom tengah yang sangat sempit agar centeringnya kuat
+    _, col_center, _ = st.columns([2.2, 1, 2.2])
+    with col_center:
         st.image(NAMA_FILE_LOGO, width=100)
+else:
+    st.write("Logo tidak ditemukan")
 
 st.markdown(f"""
-    <div class="header-text">
+    <div class="header-container">
         <h2 style="margin-bottom: 0px; color: #0f172a; font-weight: bold; font-size: 1.5rem;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
         <p style="color: #1e40af; font-weight: 700; margin-top: 5px;">Monitoring Water Level Real-Time</p>
     </div>
@@ -192,36 +208,24 @@ if df_pred is not None:
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # Prediksi (Opacity dinaikkan biar tegas di HP)
+    # Prediksi - Dibuat Lebih Solid untuk Mobile
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
-    fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='#cbd5e1', width=2.5)))
+    fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='#94a3b8', width=2.5)))
     
-    # AWS Data
     if os.path.exists(FILE_HISTORY_AWS):
         dh_aws = pd.read_csv(FILE_HISTORY_AWS)
         dh_aws['waktu'] = pd.to_datetime(dh_aws['waktu'])
         dh_aws = dh_aws[(dh_aws['waktu'] >= t_start) & (dh_aws['waktu'] <= t_end)]
         fig.add_trace(go.Scatter(x=dh_aws['waktu'], y=dh_aws['nilai'], name='AWS Priok', line=dict(color='#1e40af', width=3)))
 
-    # BPBD Data
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_bpbd = pd.read_csv(FILE_HISTORY_BPBD)
         dh_bpbd['waktu'] = pd.to_datetime(dh_bpbd['waktu'])
         dh_bpbd = dh_bpbd[(dh_bpbd['waktu'] >= t_start) & (dh_bpbd['waktu'] <= t_end)]
         fig.add_trace(go.Scatter(x=dh_bpbd['waktu'], y=dh_bpbd['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
 
-    # Garis Waktu Sekarang & Rob
     fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#10b981", width=2, dash="dot"))
-    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS ROB")
-    fig.add_hline(y=2.3, line_dash="dash", line_color="#f59e0b", annotation_text="WASPADA")
-
-    fig.update_layout(
-        height=450, 
-        template="plotly_white", 
-        hovermode="x unified",
-        margin=dict(l=10, r=10, t=30, b=10),
-        legend=dict(orientation="h", y=1.1, x=1, xanchor="right")
-    )
+    fig.update_layout(height=450, template="plotly_white", hovermode="x unified", legend=dict(orientation="h", y=1.1, x=1, xanchor="right"))
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 

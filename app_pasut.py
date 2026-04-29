@@ -40,8 +40,9 @@ st.markdown("""
 
 # --- 2. LOGIC WAKTU ---
 tz_jkt = pytz.timezone('Asia/Jakarta')
-# Pastikan 'sekarang' tidak punya info timezone agar cocok dengan data dari Excel
 sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
+# Format string untuk sumbu X agar Plotly tidak perlu menghitung math datetime
+sekarang_str = sekarang.strftime('%Y-%m-%d %H:%M')
 
 # --- 3. SIDEBAR ---
 with st.sidebar:
@@ -167,25 +168,32 @@ if df_pred is not None:
                     delta=f"{live_data['bpbd'] - h_pred:+.2f} m" if live_data["bpbd"] else None, delta_color="inverse")
     m_col[3].metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
 
-    # --- CHART LOGIC (THE FIX) ---
+    # --- CHART LOGIC (FORCE STRING X-AXIS TO PREVENT SUM ERROR) ---
     t_start = datetime.combine(tgl_range[0], datetime.min.time())
     t_end = datetime.combine(tgl_range[1], datetime.max.time())
     
+    # Filter data
+    df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
+    
+    # Buat kolom string untuk sumbu X
+    df_p['waktu_str'] = df_p[col_tgl].dt.strftime('%Y-%m-%d %H:%M')
+    
     fig = go.Figure()
-    df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     
-    # Plotting Prediksi (Pakai format datetime murni)
-    fig.add_trace(go.Scatter(x=df_p[col_tgl].dt.to_pydatetime(), y=df_p[col_val], name='Prediksi', line=dict(color='rgba(15, 23, 42, 0.2)', width=2)))
+    # Trace 1: Prediksi (Pakai string)
+    fig.add_trace(go.Scatter(x=df_p['waktu_str'], y=df_p[col_val], name='Prediksi', line=dict(color='rgba(15, 23, 42, 0.2)', width=2)))
     
+    # Trace 2 & 3: History (Pakai string)
     if os.path.exists(FILE_HISTORY_AWS):
         df_h = pd.read_csv(FILE_HISTORY_AWS)
         df_h['waktu'] = pd.to_datetime(df_h['waktu'])
-        df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end)]
-        fig.add_trace(go.Scatter(x=df_h['waktu'].dt.to_pydatetime(), y=df_h['nilai'], name='AWS', line=dict(color='#1e40af', width=3)))
+        df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end)].copy()
+        df_h['waktu_str'] = df_h['waktu'].dt.strftime('%Y-%m-%d %H:%M')
+        fig.add_trace(go.Scatter(x=df_h['waktu_str'], y=df_h['nilai'], name='AWS', line=dict(color='#1e40af', width=3)))
 
-    # GARIS VERTIKAL SEKARANG
+    # GARIS VERTIKAL (Pakai string `sekarang_str`)
     fig.add_vline(
-        x=sekarang, 
+        x=sekarang_str, 
         line_dash="dot", line_color="#10b981", line_width=2,
         annotation_text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})", 
         annotation_position="top",
@@ -197,7 +205,9 @@ if df_pred is not None:
     
     fig.update_layout(height=400, template="plotly_white", yaxis_range=[1.3, 3.0], 
                       margin=dict(l=10, r=10, t=30, b=10),
+                      xaxis=dict(type='category', tickangle=-45, nbinsx=10), # Force category agar string urut
                       legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+    
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     # --- FOOTER ---

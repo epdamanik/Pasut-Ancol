@@ -30,7 +30,7 @@ st.markdown("""
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     
-    /* FIX: Memaksa tinggi kotak sama (130px) agar seragam saat ada delta */
+    /* Memaksa tinggi kotak sama (130px) agar seragam saat ada delta */
     div[data-testid="stMetric"] {
         background-color: #f8fafc !important; 
         border: 1px solid #e2e8f0 !important;
@@ -98,12 +98,14 @@ def save_to_csv(filename, waktu, nilai):
     
     # 1. TENTUKAN TARGET TIMESTAMP
     if "bpbd" in filename.lower():
-        if waktu.minute >= 30: # Bisa kamu ganti 45 sesuai kebutuhanmu
+        # BPBD: Hanya proses kalau script jalan di menit 15 s.d. 29
+        if 15 <= waktu.minute < 30:
             waktu_fixed = waktu.replace(minute=0, second=0, microsecond=0)
             waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
         else:
             return 
     else:
+        # AWS: Tetap catat per 15 menit
         menit_bulat = (waktu.minute // 15) * 15
         waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
         waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
@@ -112,32 +114,16 @@ def save_to_csv(filename, waktu, nilai):
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     
     if not os.path.exists(filename):
-        # Kalau file belum ada, langsung buat baru
         new_data.to_csv(filename, index=False)
     else:
         try:
             old_data = pd.read_csv(filename)
-            
-            # Hapus baris lama yang jam-nya sama dengan jam saat ini (agar tidak double)
-            old_data = old_data[old_data['waktu'] != waktu_str]
-            
-            # Gabungkan data lama dengan data tarikan terbaru, lalu simpan
+            old_data = old_data[old_data['waktu'] != waktu_str] # Hapus data lama yg jam-nya sama
             combined = pd.concat([old_data, new_data])
             combined.sort_values('waktu', inplace=True)
             combined.to_csv(filename, index=False)
         except: 
             pass
-
-    new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
-    if not os.path.exists(filename):
-        new_data.to_csv(filename, index=False)
-    else:
-        try:
-            old_data = pd.read_csv(filename)
-            combined = pd.concat([old_data, new_data]).drop_duplicates(subset=['waktu'], keep='last')
-            combined.sort_values('waktu', inplace=True)
-            combined.to_csv(filename, index=False)
-        except: pass
 
 @st.cache_data(ttl=800)
 def fetch_all_realtime():
@@ -155,6 +141,7 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
+        # 1. Scraping AWS Priok
         try:
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
@@ -162,19 +149,18 @@ def fetch_all_realtime():
             if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
         except: pass
         
+        # 2. Scraping BPBD DSDADKI Baru
         try:
-            driver.get("https://bpbd.jakarta.go.id/waterlevel")
-            time.sleep(3)
-            rows = driver.find_elements(By.TAG_NAME, "tr")
-            for r in rows:
-                if "Pasar Ikan" in r.text:
-                    match = re.search(r"(\d+[\.,]?\d*)\s*(?:cm|m)", r.text.lower())
-                    if match:
-                        val = float(match.group(1).replace(',', '.'))
-                        if "cm" in r.text.lower(): val /= 100
-                        if val <= LIMIT_SENSOR_ERROR: res["bpbd"] = val
-                    break
+            driver.get("https://poskobanjir.dsdadki.web.id/")
+            el = WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_CtrlDataTinggiAir_GridListPintuAir_cell10_4_ASPxLabel1_10"))
+            )
+            val_str = el.text.strip()
+            if val_str:
+                val = float(val_str) / 100 # Konversi cm ke meter
+                if val <= LIMIT_SENSOR_ERROR: res["bpbd"] = val
         except: pass
+        
         driver.quit()
     except:
         if driver: driver.quit()

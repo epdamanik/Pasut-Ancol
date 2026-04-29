@@ -45,6 +45,7 @@ st.markdown("""
 
 # --- 2. LOGIC WAKTU (FORCE ASIA/JAKARTA) ---
 tz_jkt = pytz.timezone('Asia/Jakarta')
+# Menggunakan replace(tzinfo=None) agar kompatibel dengan data Excel/CSV yang biasanya naive datetime
 sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
 
 # --- 3. SIDEBAR ---
@@ -148,7 +149,7 @@ save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
-    # Summary Box (BOLD + YEAR)
+    # Summary Box
     df_hari_ini = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_hari_ini.empty:
         idx_max, idx_min = df_hari_ini[col_val].idxmax(), df_hari_ini[col_val].idxmin()
@@ -194,9 +195,9 @@ if df_pred is not None:
         df_hb = df_hb[(df_hb['waktu'] >= t_start) & (df_hb['waktu'] <= t_end) & (df_hb['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_hb['waktu'], y=df_hb['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
 
-    # Garis Vertikal (FIXED: Menggunakan objek datetime langsung)
+    # --- BAGIAN PERBAIKAN GARIS VERTIKAL (x=sekarang.isoformat()) ---
     fig.add_vline(
-        x=sekarang, 
+        x=sekarang.isoformat(), 
         line_dash="dot", line_color="#10b981", line_width=2,
         annotation_text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})", 
         annotation_position="top",
@@ -214,16 +215,16 @@ if df_pred is not None:
     )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # --- 8. FOOTER & ACTIONS ---
+    # --- 8. FOOTER ---
     st.divider()
-    st.caption(f"Update Terakhir: {sekarang.strftime('%H:%M:%S')} WIB")
+    st.caption(f"Update: {sekarang.strftime('%H:%M:%S')} WIB")
     f_col = st.columns(3)
     with f_col[0]: 
-        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Unduh CSV AWS", open(FILE_HISTORY_AWS, "rb"), "aws_priok.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 AWS", open(FILE_HISTORY_AWS, "rb"), "aws.csv", use_container_width=True)
     with f_col[1]: 
-        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Unduh CSV BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd.csv", use_container_width=True)
     with f_col[2]: 
-        if st.button("🔄 Refresh Data", use_container_width=True):
+        if st.button("🔄 Refresh", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import pytz  
 from streamlit_autorefresh import st_autorefresh
 import os
 import time
@@ -18,51 +19,23 @@ now_sync = datetime.now()
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
 st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 
-# --- 1. KONFIGURASI HALAMAN & CSS (FIXED SIZE & MOBILE READY) ---
+# --- 1. KONFIGURASI HALAMAN & CSS ---
 st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_icon="🌊")
 
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
-    
-    /* Style Label Metric agar Sejajar */
-    [data-testid="stMetricLabel"] { 
-        opacity: 1 !important; 
-        color: #1e3a8a !important; 
-        font-weight: 700 !important; 
-        height: 2.5rem !important; 
-        overflow: hidden !important; 
-    }
-    
-    /* Style Nilai Metric */
-    [data-testid="stMetricValue"] { 
-        font-size: 24px !important; 
-        font-weight: 850 !important; 
-        color: #0f172a !important; 
-    }
-
-    /* Kunci Ukuran Kotak Metric (Fixed Height) */
+    [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; height: 2.5rem !important; overflow: hidden !important; }
+    [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     div[data-testid="stMetric"] {
-        background-color: #f8fafc !important; 
-        border: 1px solid #e2e8f0 !important;
-        border-left: 5px solid #1e40af !important; 
-        padding: 15px !important;
-        border-radius: 10px !important;
+        background-color: #f8fafc !important; border: 1px solid #e2e8f0 !important;
+        border-left: 5px solid #1e40af !important; padding: 15px !important; border-radius: 10px !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
-        min-height: 140px !important; 
-        max-height: 140px !important;
-        display: flex !important; 
-        flex-direction: column !important; 
-        justify-content: center !important;
+        min-height: 140px !important; max-height: 140px !important;
+        display: flex !important; flex-direction: column !important; justify-content: center !important;
     }
-
-    /* Optimasi Tampilan HP */
     @media (max-width: 768px) {
-        div[data-testid="stMetric"] { 
-            min-height: 110px !important; 
-            max-height: 110px !important; 
-            margin-bottom: 10px !important; 
-        }
+        div[data-testid="stMetric"] { min-height: 110px !important; max-height: 110px !important; margin-bottom: 10px !important; }
         [data-testid="stMetricValue"] { font-size: 20px !important; }
         [data-testid="stMetricLabel"] { height: 2rem !important; font-size: 0.85rem !important; }
     }
@@ -70,10 +43,9 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. LOGIC WAKTU (WIB) ---
-sekarang = datetime.now()
-if os.name != 'nt': # Jika di Streamlit Cloud (Linux)
-    sekarang = sekarang + timedelta(hours=7)
+# --- 2. LOGIC WAKTU (FORCE ASIA/JAKARTA) ---
+tz_jkt = pytz.timezone('Asia/Jakarta')
+sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
 
 # --- 3. SIDEBAR ---
 with st.sidebar:
@@ -94,7 +66,7 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 st.divider()
 
-# --- 5. DATA PARAMETERS & FUNCTIONS ---
+# --- 5. DATA FUNCTIONS ---
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
@@ -132,7 +104,6 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
-        # Scrape AWS
         try:
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "waterlevel")))
@@ -140,7 +111,6 @@ def fetch_all_realtime():
             if val < LIMIT_SENSOR_ERROR: res["aws"] = val
         except: pass
 
-        # Scrape BPBD
         try:
             driver.get("https://bpbd.jakarta.go.id/waterlevel")
             time.sleep(10)
@@ -176,7 +146,7 @@ live_data = fetch_all_realtime()
 save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
 save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
-# --- 7. DISPLAY METRICS & CHART ---
+# --- 7. DISPLAY ---
 if df_pred is not None:
     # Summary Box (BOLD + YEAR)
     df_hari_ini = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
@@ -202,58 +172,51 @@ if df_pred is not None:
                     delta=f"{live_data['bpbd'] - h_pred:+.2f} m" if live_data["bpbd"] else None, delta_color="inverse")
     m_col[3].metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
 
-    # Chart Configuration
+    # Chart
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # Trace 1: Prediksi
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='rgba(15, 23, 42, 0.2)', width=2)))
     
-    # Trace 2: AWS History (Filtered)
     if os.path.exists(FILE_HISTORY_AWS):
         df_h = pd.read_csv(FILE_HISTORY_AWS)
         df_h['waktu'] = pd.to_datetime(df_h['waktu'])
         df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end) & (df_h['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_h['waktu'], y=df_h['nilai'], name='AWS', line=dict(color='#1e40af', width=3)))
 
-    # Trace 3: BPBD History (Filtered)
     if os.path.exists(FILE_HISTORY_BPBD):
         df_hb = pd.read_csv(FILE_HISTORY_BPBD)
         df_hb['waktu'] = pd.to_datetime(df_hb['waktu'])
         df_hb = df_hb[(df_hb['waktu'] >= t_start) & (df_hb['waktu'] <= t_end) & (df_hb['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=df_hb['waktu'], y=df_hb['nilai'], name='Psr Ikan', line=dict(color='#15803d', width=3)))
 
-    # --- SEMUA GARIS AMAN DI SINI ---
-    # Garis Vertikal (Sekarang) - FIXED TIMESTAMP
+    # Garis & Label (Sekarang dengan Jam:Menit)
     fig.add_vline(
         x=sekarang.timestamp() * 1000, 
         line_dash="dot", line_color="#10b981", line_width=2,
-        annotation_text="WAKTU SEKARANG", annotation_position="top",
+        annotation_text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})", 
+        annotation_position="top",
         annotation_font_size=10, annotation_font_color="#10b981", annotation_bgcolor="white"
     )
-    
-    # Garis Horizontal (Rob)
     fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ef4444", annotation_text="🔴 AWAS ROB")
     fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA ROB")
     
-    fig.update_layout(
-        height=400, template="plotly_white", yaxis_range=[1.3, 3.0], 
-        margin=dict(l=10, r=10, t=30, b=10),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
+    fig.update_layout(height=400, template="plotly_white", yaxis_range=[1.3, 3.0], 
+                      margin=dict(l=10, r=10, t=30, b=10),
+                      legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # --- 8. FOOTER & ACTIONS ---
+    # --- 8. FOOTER ---
     st.divider()
-    st.caption(f"Update Terakhir: {sekarang.strftime('%H:%M:%S')} WIB")
+    st.caption(f"Update: {sekarang.strftime('%H:%M:%S')} WIB")
     f_col = st.columns(3)
     with f_col[0]: 
-        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Unduh CSV AWS", open(FILE_HISTORY_AWS, "rb"), "aws_priok.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 AWS", open(FILE_HISTORY_AWS, "rb"), "aws.csv", use_container_width=True)
     with f_col[1]: 
-        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Unduh CSV BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd_pasarikan.csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 BPBD", open(FILE_HISTORY_BPBD, "rb"), "bpbd.csv", use_container_width=True)
     with f_col[2]: 
-        if st.button("🔄 Refresh Data", use_container_width=True):
+        if st.button("🔄 Refresh", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 

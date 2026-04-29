@@ -7,6 +7,7 @@ from streamlit_autorefresh import st_autorefresh
 import os
 import time
 import re
+import base64
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -30,7 +31,6 @@ st.markdown("""
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     
-    /* Memaksa tinggi kotak sama (130px) agar seragam saat ada delta */
     div[data-testid="stMetric"] {
         background-color: #f8fafc !important; 
         border: 1px solid #e2e8f0 !important;
@@ -43,7 +43,6 @@ st.markdown("""
         justify-content: center;
     }
 
-    /* Styling teks delta/selisih */
     [data-testid="stMetricDelta"] {
         font-weight: 600 !important;
         font-size: 0.85rem !important;
@@ -93,24 +92,33 @@ FILE_HISTORY_AWS = 'history_aws_priok.csv'
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
 LIMIT_SENSOR_ERROR = 3.5 
 
+def play_audio(file_path):
+    """Fungsi untuk memutar file mp3 lokal satu kali per refresh"""
+    if os.path.exists(file_path):
+        with open(file_path, "rb") as f:
+            data = f.read()
+            b64 = base64.b64encode(data).decode()
+            audio_html = f"""
+                <audio autoplay>
+                    <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+                </audio>
+            """
+            st.components.v1.html(audio_html, height=0)
+
 def save_to_csv(filename, waktu, nilai):
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
     
-    # 1. TENTUKAN TARGET TIMESTAMP
     if "bpbd" in filename.lower():
-        # BPBD: Hanya proses kalau script jalan di menit 15 s.d. 29
         if 15 <= waktu.minute < 30:
             waktu_fixed = waktu.replace(minute=0, second=0, microsecond=0)
             waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
         else:
             return 
     else:
-        # AWS: Tetap catat per 15 menit
         menit_bulat = (waktu.minute // 15) * 15
         waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
         waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
 
-    # 2. PROSES SIMPAN & TIMPA DATA (OVERWRITE)
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     
     if not os.path.exists(filename):
@@ -118,7 +126,7 @@ def save_to_csv(filename, waktu, nilai):
     else:
         try:
             old_data = pd.read_csv(filename)
-            old_data = old_data[old_data['waktu'] != waktu_str] # Hapus data lama yg jam-nya sama
+            old_data = old_data[old_data['waktu'] != waktu_str]
             combined = pd.concat([old_data, new_data])
             combined.sort_values('waktu', inplace=True)
             combined.to_csv(filename, index=False)
@@ -141,7 +149,6 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
-        # 1. Scraping AWS Priok
         try:
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
@@ -149,7 +156,6 @@ def fetch_all_realtime():
             if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
         except: pass
         
-        # 2. Scraping BPBD DSDADKI Baru
         try:
             driver.get("https://poskobanjir.dsdadki.web.id/")
             el = WebDriverWait(driver, 15).until(
@@ -157,7 +163,7 @@ def fetch_all_realtime():
             )
             val_str = el.text.strip()
             if val_str:
-                val = float(val_str) / 100 # Konversi cm ke meter
+                val = float(val_str) / 100
                 if val <= LIMIT_SENSOR_ERROR: res["bpbd"] = val
         except: pass
         
@@ -183,6 +189,27 @@ save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
+    # --- LOGIKA ALERT SISTEM ---
+    h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
+    
+    # Kumpulkan nilai untuk pengecekan alert
+    check_values = {
+        "Prediksi Model": h_now,
+        "AWS Tj. Priok": live_data['aws'],
+        "Psr. Ikan (BPBD)": live_data['bpbd']
+    }
+    
+    awas_list = [n for n, v in check_values.items() if v is not None and v >= 2.5]
+    waspada_list = [n for n, v in check_values.items() if v is not None and 2.3 <= v < 2.5]
+
+    # Eksekusi Visual & Sound Alert
+    if awas_list:
+        st.error(f"### 🚨 STATUS: AWAS ROB! \n Level air kritis (≥ 2.5m) terdeteksi pada: **{', '.join(awas_list)}**. Segera lakukan tindakan pengamanan!", icon="⚠️")
+        play_audio("AWAS ROB.mp3") 
+    elif waspada_list:
+        st.warning(f"### ⚠️ STATUS: WASPADA ROB! \n Kenaikan air (≥ 2.3m) terdeteksi pada: **{', '.join(waspada_list)}**. Pantau terus perkembangan situasi!", icon="📢")
+        play_audio("waspada ROB.mp3")
+
     # Summary Box
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
@@ -191,30 +218,16 @@ if df_pred is not None:
         val_min, jam_min = df_h.loc[i_min, col_val], df_h.loc[i_min, col_tgl].strftime("%H:%M")
         st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {val_max:.2f}m ({jam_max} WIB)</span> | <span style="color: #3b82f6;">▼ MIN: {val_min:.2f}m ({jam_min} WIB)</span></span></div>', unsafe_allow_html=True)
 
-    # --- HITUNG SELISIH ---
-    h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
-    
+    # Metrics
     diff_aws = (live_data['aws'] - h_now) if live_data['aws'] is not None else None
     diff_bpbd = (live_data['bpbd'] - h_now) if live_data['bpbd'] is not None else None
 
-    # Metrics
     m_col = st.columns(4)
     m_col[0].metric("Prediksi (Model)", f"{h_now:.2f} m")
-    
-    m_col[1].metric(
-        label="TMA AWS Tj. Priok", 
-        value=f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A",
-        delta=f"{diff_aws:+.2f} m dr prediksi" if diff_aws is not None else None,
-        delta_color="inverse"
-    )
-    
-    m_col[2].metric(
-        label="TMA Pintu Air Psr. Ikan", 
-        value=f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A",
-        delta=f"{diff_bpbd:+.2f} m dr prediksi" if diff_bpbd is not None else None,
-        delta_color="inverse"
-    )
-    
+    m_col[1].metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", 
+                    delta=f"{diff_aws:+.2f} m dr prediksi" if diff_aws is not None else None, delta_color="inverse")
+    m_col[2].metric("TMA Pintu Air Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", 
+                    delta=f"{diff_bpbd:+.2f} m dr prediksi" if diff_bpbd is not None else None, delta_color="inverse")
     m_col[3].metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] - h_now) > 0.05 else "📉 SURUT")
 
     # Chart

@@ -27,7 +27,6 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; }
     
-    /* Metric Styling */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     
@@ -36,20 +35,15 @@ st.markdown("""
         border-left: 5px solid #1e40af !important; padding: 15px !important; border-radius: 10px !important;
     }
 
-    /* Summary Box */
     .summary-box {
-        background-color: #f1f5f9 !important; 
-        padding: 12px !important; 
-        border-radius: 10px !important; 
-        margin-bottom: 15px !important; 
-        border-left: 5px solid #1e3a8a !important;
-        text-align: center !important;
+        background-color: #f1f5f9 !important; padding: 12px !important; 
+        border-radius: 10px !important; margin-bottom: 15px !important; 
+        border-left: 5px solid #1e3a8a !important; text-align: center !important;
     }
     .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
 
     @media (max-width: 768px) {
         div[data-testid="stMetric"] { min-height: 110px !important; margin-bottom: 10px !important; }
-        .summary-text { font-size: 0.85rem !important; }
     }
     footer {visibility: hidden;}
     </style>
@@ -64,9 +58,8 @@ with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
 
-# --- 4. HEADER (LOGO & JUDUL) ---
+# --- 4. HEADER (LOGO CENTER) ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
-
 c1, c2, c3 = st.columns([1, 0.4, 1])
 with c2:
     if os.path.exists(NAMA_FILE_LOGO):
@@ -74,7 +67,7 @@ with c2:
 
 st.markdown(f"""
     <div class="header-text">
-        <h2 style="margin-bottom: 0px; color: #0f172a; font-weight: bold; font-size: 1.5rem; line-height: 1.2;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
+        <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.5rem;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
         <p style="color: #1e40af; font-weight: 700; margin-top: 5px;">Monitoring Water Level Real-Time</p>
     </div>
     """, unsafe_allow_html=True)
@@ -84,10 +77,9 @@ st.divider()
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
-LIMIT_SENSOR_ERROR = 3.5 
 
 def save_to_csv(filename, waktu, nilai):
-    if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
+    if nilai is None or nilai > 3.5: return
     waktu_str = waktu.strftime('%Y-%m-%d %H:%M')
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     if not os.path.exists(filename):
@@ -105,7 +97,6 @@ def fetch_all_realtime():
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36")
     driver = None
     res = {"aws": None, "bpbd": None}
     try:
@@ -116,26 +107,21 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
-        try:
-            driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
-            el = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, "waterlevel")))
-            res["aws"] = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
-        except: pass
-
-        try:
-            driver.get("https://bpbd.jakarta.go.id/waterlevel")
-            time.sleep(5)
-            rows = driver.find_elements(By.TAG_NAME, "tr")
-            for r in rows:
-                if "Pasar Ikan" in r.text:
-                    txt = r.text.lower()
-                    match = re.search(r"(\d+[\.,]?\d*)\s*(?:cm|m)", txt)
-                    if match:
-                        val = float(match.group(1).replace(',', '.'))
-                        if "cm" in txt: val /= 100
-                        res["bpbd"] = val
-                    break
-        except: pass
+        driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
+        el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
+        res["aws"] = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
+        
+        driver.get("https://bpbd.jakarta.go.id/waterlevel")
+        time.sleep(3)
+        rows = driver.find_elements(By.TAG_NAME, "tr")
+        for r in rows:
+            if "Pasar Ikan" in r.text:
+                match = re.search(r"(\d+[\.,]?\d*)\s*(?:cm|m)", r.text.lower())
+                if match:
+                    val = float(match.group(1).replace(',', '.'))
+                    if "cm" in r.text.lower(): val /= 100
+                    res["bpbd"] = val
+                break
         driver.quit()
     except:
         if driver: driver.quit()
@@ -145,8 +131,8 @@ def fetch_all_realtime():
 def load_prediction():
     if not os.path.exists(FILE_PREDIKSI): return None, None, None
     df = pd.read_excel(FILE_PREDIKSI, engine='openpyxl')
-    t_col = next((c for c in ['tanggal_prediksi', 'jam_group', 'Waktu_WIB', 'Waktu'] if c in df.columns), None)
-    v_col = next((c for c in ['wl_prediksi', 'wl_final', 'Tinggi_Navigasi_m'] if c in df.columns), None)
+    t_col = next((c for c in ['tanggal_prediksi', 'Waktu_WIB', 'Waktu'] if c in df.columns), None)
+    v_col = next((c for c in ['wl_prediksi', 'Tinggi_Navigasi_m'] if c in df.columns), None)
     if t_col: df[t_col] = pd.to_datetime(df[t_col])
     return df.sort_values(t_col), t_col, v_col
 
@@ -162,11 +148,7 @@ if df_pred is not None:
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         i_max, i_min = df_h[col_val].idxmax(), df_h[col_val].idxmin()
-        st.markdown(f"""
-        <div class="summary-box">
-            <span class="summary-text">📅 {sekarang.strftime('%d %b %Y')} | <span style="color: #ef4444;">▲ MAX: {df_h.loc[i_max, col_val]:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {df_h.loc[i_min, col_val]:.2f}m</span></span>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {df_h.loc[i_max, col_val]:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {df_h.loc[i_min, col_val]:.2f}m</span></span></div>', unsafe_allow_html=True)
 
     # Metrics
     m_col = st.columns(4)
@@ -180,61 +162,38 @@ if df_pred is not None:
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # Trace 1: Prediksi (Abu-abu Gelap)
+    # Prediksi (Dashed)
     df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
     
-    # Trace 2: AWS Priok (BIRU TEBAL + TITIK)
+    # AWS Priok (TEBAL + TITIK)
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end)]
-        fig.add_trace(go.Scatter(
-            x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Priok',
-            mode='lines+markers',
-            marker=dict(size=6, symbol='circle'),
-            line=dict(color='#0033cc', width=4)
-        ))
+        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Priok', mode='lines+markers', marker=dict(size=6), line=dict(color='#0033cc', width=4)))
 
-    # Trace 3: Psr Ikan (ORANGE TEBAL + TITIK)
+    # BPBD Psr Ikan (ORANGE)
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end)]
-        fig.add_trace(go.Scatter(
-            x=dh_b['waktu'], y=dh_b['nilai'], name='Psr Ikan',
-            mode='lines+markers',
-            marker=dict(size=6, symbol='diamond'),
-            line=dict(color='#f59e0b', width=4)
-        ))
+        fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Psr Ikan', mode='lines+markers', line=dict(color='#f59e0b', width=4)))
 
-    # GARIS WAKTU SEKARANG + LABEL
+    # Garis Sekarang & Label (FIXED VERSION)
     fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=3, dash="dash"))
     fig.add_annotation(
         x=sekarang, y=1.05, yref="paper",
-        text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})",
-        showarrow=False, font=dict(size=12, color="#22c55e", font_weight="bold"),
+        text=f"<b>WAKTU SEKARANG ({sekarang.strftime('%H:%M')})</b>",
+        showarrow=False, font=dict(size=12, color="#22c55e"),
         bgcolor="white", bordercolor="#22c55e", borderwidth=1, borderpad=4, yanchor="bottom"
     )
     
-    # Rob Threshold Lines
-    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="BATAS AWAS ROB")
-    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="WASPADA")
+    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS ROB")
 
-    fig.update_layout(
-        height=500, 
-        template="plotly_white", 
-        hovermode="x unified",
-        legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"),
-        margin=dict(l=10, r=10, t=60, b=10)
-    )
-    
+    fig.update_layout(height=500, template="plotly_white", hovermode="x unified", legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"), margin=dict(l=10, r=10, t=60, b=10))
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     # Footer
     st.divider()
     f_col = st.columns(3)
-    with f_col[0]: st.download_button("📥 AWS CSV", open(FILE_HISTORY_AWS, "rb") if os.path.exists(FILE_HISTORY_AWS) else "", "aws.csv", use_container_width=True)
-    with f_col[1]: st.download_button("📥 BPBD CSV", open(FILE_HISTORY_BPBD, "rb") if os.path.exists(FILE_HISTORY_BPBD) else "", "bpbd.csv", use_container_width=True)
     with f_col[2]: 
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
-
-    st.markdown('<div style="text-align: center; color: #64748b; font-size: 10px; font-weight: bold; margin-top: 10px;">© 2026 BMKG Maritim Tanjung Priok</div>', unsafe_allow_html=True)

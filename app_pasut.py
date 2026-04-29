@@ -19,7 +19,7 @@ st.markdown("""
     /* Background aplikasi */
     .stApp { background-color: #ffffff; }
     
-    /* FIX OPACITY: Memaksa label metric hitam pekat agar kelihatan di HP */
+    /* FIX OPACITY & WARNA: Memaksa label metric hitam pekat agar kelihatan di HP */
     [data-testid="stMetricLabel"] {
         opacity: 1 !important;
         color: #000000 !important;
@@ -33,19 +33,26 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* Box metric agar lebih kontras */
-    .stMetric {
+    /* FIX SIMETRIS: Menyamakan tinggi kotak metric agar estetik */
+    [data-testid="stMetric"] {
         background-color: #ffffff;
         padding: 15px;
         border-radius: 12px;
         border: 2px solid #e0e0e0;
         box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        min-height: 140px; /* Paksa tinggi minimal agar sama semua */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
 
     /* Responsivitas HP */
     @media (max-width: 640px) {
         [data-testid="stMetricValue"] {
             font-size: 22px !important;
+        }
+        [data-testid="stMetric"] {
+            min-height: 120px;
         }
     }
 
@@ -57,7 +64,6 @@ st.markdown("""
 with st.sidebar:
     st.subheader("🗓️ Filter Waktu")
     sekarang = datetime.now()
-    # Penyesuaian timezone jika dideploy di cloud (Streamlit Cloud pake UTC)
     if os.name != 'nt': sekarang = sekarang + timedelta(hours=7)
 
     tgl_range = st.date_input(
@@ -96,7 +102,8 @@ from selenium.webdriver.support import expected_conditions as EC
 
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY = 'history_aws_priok.csv' 
-BATAS_ROB = 2.5
+BATAS_ROB_AWAS = 2.5
+BATAS_ROB_WASPADA = 2.3
 
 def save_to_csv(waktu, nilai):
     waktu_str = waktu.strftime('%Y-%m-%d %H:%M')
@@ -205,11 +212,12 @@ if df_pred is not None:
 
     val_tampil = aws_val if aws_val else (df_hist['nilai'].iloc[-1] if not df_hist.empty else h_pred)
     
+    # Render Metrics
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Aktual (AWS)", f"{val_tampil:.2f} m", delta=f"{val_tampil - h_pred:.2f} m" if aws_val else None, delta_color="inverse")
     m2.metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
     m3.metric("Prediksi", f"{h_pred:.2f} m")
-    m4.metric("Batas ROB", f"{BATAS_ROB} m")
+    m4.metric("Batas AWAS ROB", f"{BATAS_ROB_AWAS} m")
 
     # Grafik
     t_start_view = datetime.combine(tgl_range[0], datetime.min.time())
@@ -229,16 +237,15 @@ if df_pred is not None:
                                  mode='markers+text', marker=dict(color=['#cc0000', '#004085'], size=12, symbol='diamond'),
                                  text=['HIGH', 'LOW'], textposition='top center', name='Daily H/L'))
 
-    fig.add_hline(y=BATAS_ROB, line_dash="dash", line_color="#ff8c00", annotation_text="WASPADA ROB")
+    # GARIS BATAS ROB (AWAS & WASPADA)
+    fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ff0000", annotation_text="🔴 AWAS ROB")
+    fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#ffa500", annotation_text="🟠 WASPADA ROB")
     
-    # --- FIX AREA: GARIS WAKTU SEKARANG + LABEL ---
-    # Pakai vline tanpa annotation untuk garisnya
+    # GARIS WAKTU SEKARANG + LABEL
     fig.add_vline(x=sekarang, line_dash="dot", line_width=2, line_color="#008000")
-    
-    # Pakai add_annotation manual supaya tidak kena TypeError internal Plotly
     fig.add_annotation(
         x=sekarang,
-        y=1.05, # sedikit di atas grafik
+        y=1.05,
         yref="paper", 
         text=f"Waktu Sekarang: {sekarang.strftime('%H:%M')}",
         showarrow=False,

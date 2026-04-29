@@ -32,7 +32,6 @@ st.markdown("""
         border-left: 5px solid #1e40af !important; padding: 15px !important; border-radius: 10px !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
         min-height: 140px !important; max-height: 140px !important;
-        display: flex !important; flex-direction: column !important; justify-content: center !important;
     }
     footer {visibility: hidden;}
     </style>
@@ -41,8 +40,6 @@ st.markdown("""
 # --- 2. LOGIC WAKTU ---
 tz_jkt = pytz.timezone('Asia/Jakarta')
 sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
-# Format string untuk sumbu X agar Plotly tidak perlu menghitung math datetime
-sekarang_str = sekarang.strftime('%Y-%m-%d %H:%M')
 
 # --- 3. SIDEBAR ---
 with st.sidebar:
@@ -168,46 +165,44 @@ if df_pred is not None:
                     delta=f"{live_data['bpbd'] - h_pred:+.2f} m" if live_data["bpbd"] else None, delta_color="inverse")
     m_col[3].metric("Tren 3 Jam", "📈 PASANG" if selisih_tren > 0.05 else "📉 SURUT" if selisih_tren < -0.05 else "➡️ STAGNAN")
 
-    # --- CHART LOGIC (FORCE STRING X-AXIS TO PREVENT SUM ERROR) ---
+    # --- CHART LOGIC (THE STABLE VERSION) ---
     t_start = datetime.combine(tgl_range[0], datetime.min.time())
     t_end = datetime.combine(tgl_range[1], datetime.max.time())
     
-    # Filter data
-    df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
-    
-    # Buat kolom string untuk sumbu X
-    df_p['waktu_str'] = df_p[col_tgl].dt.strftime('%Y-%m-%d %H:%M')
-    
     fig = go.Figure()
     
-    # Trace 1: Prediksi (Pakai string)
-    fig.add_trace(go.Scatter(x=df_p['waktu_str'], y=df_p[col_val], name='Prediksi', line=dict(color='rgba(15, 23, 42, 0.2)', width=2)))
+    # Plotting Prediksi
+    df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
+    fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='rgba(15, 23, 42, 0.2)', width=2)))
     
-    # Trace 2 & 3: History (Pakai string)
+    # Plotting History
     if os.path.exists(FILE_HISTORY_AWS):
         df_h = pd.read_csv(FILE_HISTORY_AWS)
         df_h['waktu'] = pd.to_datetime(df_h['waktu'])
-        df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end)].copy()
-        df_h['waktu_str'] = df_h['waktu'].dt.strftime('%Y-%m-%d %H:%M')
-        fig.add_trace(go.Scatter(x=df_h['waktu_str'], y=df_h['nilai'], name='AWS', line=dict(color='#1e40af', width=3)))
+        df_h = df_h[(df_h['waktu'] >= t_start) & (df_h['waktu'] <= t_end)]
+        fig.add_trace(go.Scatter(x=df_h['waktu'], y=df_h['nilai'], name='AWS', line=dict(color='#1e40af', width=3)))
 
-    # GARIS VERTIKAL (Pakai string `sekarang_str`)
-    fig.add_vline(
-        x=sekarang_str, 
-        line_dash="dot", line_color="#10b981", line_width=2,
-        annotation_text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})", 
-        annotation_position="top",
-        annotation_font_size=10, annotation_font_color="#10b981", annotation_bgcolor="white"
+    # --- REPLACEMENT FOR add_vline (TO AVOID SUM ERROR) ---
+    # 1. Garis (Shape)
+    fig.add_shape(
+        type="line", x0=sekarang, x1=sekarang, y0=0, y1=1,
+        yref="paper", line=dict(color="#10b981", width=2, dash="dot")
+    )
+    # 2. Label (Annotation)
+    fig.add_annotation(
+        x=sekarang, y=1, yref="paper",
+        text=f"WAKTU SEKARANG ({sekarang.strftime('%H:%M')})",
+        showarrow=False, font=dict(size=10, color="#10b981"),
+        bgcolor="white", yanchor="bottom"
     )
     
+    # Rob Lines
     fig.add_hline(y=BATAS_ROB_AWAS, line_dash="dash", line_color="#ef4444", annotation_text="🔴 AWAS ROB")
     fig.add_hline(y=BATAS_ROB_WASPADA, line_dash="dash", line_color="#f59e0b", annotation_text="🟠 WASPADA ROB")
     
     fig.update_layout(height=400, template="plotly_white", yaxis_range=[1.3, 3.0], 
                       margin=dict(l=10, r=10, t=30, b=10),
-                      xaxis=dict(type='category', tickangle=-45, nbinsx=10), # Force category agar string urut
                       legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-    
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     # --- FOOTER ---

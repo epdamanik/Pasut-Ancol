@@ -181,7 +181,7 @@ if df_pred is not None:
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)]
-        fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Psr Ikan', mode='lines+markers', line=dict(color='#f59e0b', width=4)))
+        fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Pintu air Psr. Ikan', mode='lines+markers', line=dict(color='#f59e0b', width=4)))
 
     # Garis Sekarang & Rob
     fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=3, dash="dash"))

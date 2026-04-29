@@ -163,7 +163,7 @@ if df_pred is not None:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
     m_col[0].metric("Prediksi", f"{h_now:.2f} m")
     m_col[1].metric("AWS Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A")
-    m_col[2].metric("BPBD Psr Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A")
+    m_col[2].metric("Pintu Air Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A")
     m_col[3].metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] - h_now) > 0.05 else "📉 SURUT")
 
     # Chart

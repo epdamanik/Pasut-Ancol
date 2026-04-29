@@ -14,12 +14,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- 0. SMART AUTO REFRESH (Setiap 15 Menit) ---
+# --- 0. SMART AUTO REFRESH ---
 now_sync = datetime.now()
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
 st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 
-# --- 1. KONFIGURASI HALAMAN & CSS ---
+# --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_icon="🌊")
 
 st.markdown("""
@@ -58,7 +58,7 @@ with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
 
-# --- 4. HEADER (LOGO CENTER) ---
+# --- 4. HEADER ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
 c1, c2, c3 = st.columns([1, 0.4, 1])
 with c2:
@@ -77,9 +77,10 @@ st.divider()
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
+LIMIT_SENSOR_ERROR = 3.5  # <--- Balik lagi filternya
 
 def save_to_csv(filename, waktu, nilai):
-    if nilai is None or nilai > 3.5: return
+    if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
     waktu_str = waktu.strftime('%Y-%m-%d %H:%M')
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     if not os.path.exists(filename):
@@ -107,21 +108,28 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
-        driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
-        el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
-        res["aws"] = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
+        # AWS Priok
+        try:
+            driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
+            el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
+            val = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
+            if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
+        except: pass
         
-        driver.get("https://bpbd.jakarta.go.id/waterlevel")
-        time.sleep(3)
-        rows = driver.find_elements(By.TAG_NAME, "tr")
-        for r in rows:
-            if "Pasar Ikan" in r.text:
-                match = re.search(r"(\d+[\.,]?\d*)\s*(?:cm|m)", r.text.lower())
-                if match:
-                    val = float(match.group(1).replace(',', '.'))
-                    if "cm" in r.text.lower(): val /= 100
-                    res["bpbd"] = val
-                break
+        # BPBD Pasar Ikan
+        try:
+            driver.get("https://bpbd.jakarta.go.id/waterlevel")
+            time.sleep(3)
+            rows = driver.find_elements(By.TAG_NAME, "tr")
+            for r in rows:
+                if "Pasar Ikan" in r.text:
+                    match = re.search(r"(\d+[\.,]?\d*)\s*(?:cm|m)", r.text.lower())
+                    if match:
+                        val = float(match.group(1).replace(',', '.'))
+                        if "cm" in r.text.lower(): val /= 100
+                        if val <= LIMIT_SENSOR_ERROR: res["bpbd"] = val
+                    break
+        except: pass
         driver.quit()
     except:
         if driver: driver.quit()
@@ -144,11 +152,13 @@ save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
+    # Summary Box
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         i_max, i_min = df_h[col_val].idxmax(), df_h[col_val].idxmin()
         st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {df_h.loc[i_max, col_val]:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {df_h.loc[i_min, col_val]:.2f}m</span></span></div>', unsafe_allow_html=True)
 
+    # Metrics
     m_col = st.columns(4)
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
     m_col[0].metric("Prediksi", f"{h_now:.2f} m")
@@ -156,26 +166,24 @@ if df_pred is not None:
     m_col[2].metric("BPBD Psr Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A")
     m_col[3].metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] - h_now) > 0.05 else "📉 SURUT")
 
+    # Chart
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     
-    # Prediksi
-    df_p = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
-    fig.add_trace(go.Scatter(x=df_p[col_tgl], y=df_p[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
+    df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
+    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
     
-    # AWS Priok
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
-        dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end)]
+        dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Priok', mode='lines+markers', marker=dict(size=6), line=dict(color='#0033cc', width=4)))
 
-    # BPBD Psr Ikan
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
-        dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end)]
+        dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Psr Ikan', mode='lines+markers', line=dict(color='#f59e0b', width=4)))
 
-    # Garis Sekarang & Label
+    # Garis Sekarang & Rob
     fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=3, dash="dash"))
     fig.add_annotation(
         x=sekarang, y=1.05, yref="paper",
@@ -184,11 +192,14 @@ if df_pred is not None:
         bgcolor="white", bordercolor="#22c55e", borderwidth=1, borderpad=4, yanchor="bottom"
     )
     
-    # Garis Rob (DI SINI BRO PERBAIKANNYA)
-    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB (2.5m)</b>", annotation_position="top left")
-    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA (2.3m)</b>", annotation_position="bottom left")
+    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>", annotation_position="top left")
+    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>", annotation_position="bottom left")
 
-    fig.update_layout(height=500, template="plotly_white", hovermode="x unified", legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"), margin=dict(l=10, r=10, t=60, b=10))
+    fig.update_layout(
+        height=500, template="plotly_white", hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="left", x=0),
+        margin=dict(l=10, r=10, t=60, b=100)
+    )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     # Footer
@@ -196,3 +207,4 @@ if df_pred is not None:
     f_col = st.columns(3)
     with f_col[2]: 
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
+            

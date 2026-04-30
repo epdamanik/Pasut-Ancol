@@ -5,7 +5,6 @@ on:
     - cron: '*/15 * * * *' 
   workflow_dispatch: 
 
-# --- INI SURAT IZIN SAKTINYA BIAR GAK ERROR 128 ---
 permissions:
   contents: write
 
@@ -13,12 +12,14 @@ jobs:
   scrape-data:
     runs-on: ubuntu-latest
     
+    # --- INI OBAT BUAT NGILANGIN WARNING NODE.JS 20 ---
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    
     steps:
-      # --- UPGRADE KE v4 BIAR WARNING NODE.JS HILANG ---
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # --- UPGRADE KE v5 ---
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

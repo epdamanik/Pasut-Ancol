@@ -15,9 +15,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- 0. SMART AUTO REFRESH ---
+# --- 0. SMART AUTO REFRESH (Sync tiap 15 Menit) ---
 now_sync = datetime.now()
+# Menghitung detik menuju menit ke 00, 15, 30, atau 45 terdekat
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
+if seconds_to_next <= 0: seconds_to_next = 900 # Default 15 menit kalau hitungan slip
 st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 
 # --- 1. KONFIGURASI HALAMAN ---
@@ -27,10 +29,8 @@ st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; }
-    
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
-    
     div[data-testid="stMetric"] {
         background-color: #f8fafc !important; 
         border: 1px solid #e2e8f0 !important;
@@ -38,26 +38,14 @@ st.markdown("""
         padding: 15px !important; 
         border-radius: 10px !important;
         min-height: 130px !important; 
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
+        display: flex; flex-direction: column; justify-content: center;
     }
-
-    [data-testid="stMetricDelta"] {
-        font-weight: 600 !important;
-        font-size: 0.85rem !important;
-    }
-
     .summary-box {
         background-color: #f1f5f9 !important; padding: 12px !important; 
         border-radius: 10px !important; margin-bottom: 15px !important; 
         border-left: 5px solid #1e3a8a !important; text-align: center !important;
     }
     .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
-
-    @media (max-width: 768px) {
-        div[data-testid="stMetric"] { min-height: 140px !important; margin-bottom: 10px !important; }
-    }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -70,6 +58,8 @@ sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
 with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
+    st.divider()
+    st.info("Sistem akan menyimpan data otomatis setiap interval 15 menit (00, 15, 30, 45).")
 
 # --- 4. HEADER ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
@@ -93,31 +83,21 @@ FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
 LIMIT_SENSOR_ERROR = 3.5 
 
 def play_audio(file_path):
-    """Fungsi untuk memutar file mp3 lokal satu kali per refresh"""
     if os.path.exists(file_path):
         with open(file_path, "rb") as f:
             data = f.read()
             b64 = base64.b64encode(data).decode()
-            audio_html = f"""
-                <audio autoplay>
-                    <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-                </audio>
-            """
+            audio_html = f'<audio autoplay><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
             st.components.v1.html(audio_html, height=0)
 
 def save_to_csv(filename, waktu, nilai):
+    """Menyimpan data tepat pada interval 15 menit"""
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
     
-    if "bpbd" in filename.lower():
-        if 15 <= waktu.minute < 30:
-            waktu_fixed = waktu.replace(minute=0, second=0, microsecond=0)
-            waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
-        else:
-            return 
-    else:
-        menit_bulat = (waktu.minute // 15) * 15
-        waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
-        waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
+    # Pembulatan waktu ke interval 15 menit terdekat (00, 15, 30, 45)
+    menit_bulat = (waktu.minute // 15) * 15
+    waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
+    waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
 
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     
@@ -126,12 +106,11 @@ def save_to_csv(filename, waktu, nilai):
     else:
         try:
             old_data = pd.read_csv(filename)
+            # Timpa kalau ada waktu yang sama biar gak dobel
             old_data = old_data[old_data['waktu'] != waktu_str]
-            combined = pd.concat([old_data, new_data])
-            combined.sort_values('waktu', inplace=True)
+            combined = pd.concat([old_data, new_data]).sort_values('waktu')
             combined.to_csv(filename, index=False)
-        except: 
-            pass
+        except: pass
 
 @st.cache_data(ttl=800)
 def fetch_all_realtime():
@@ -149,7 +128,7 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
-        # --- SCRAPING AWS ---
+        # 1. AWS Scraping
         try:
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
@@ -157,44 +136,21 @@ def fetch_all_realtime():
             if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
         except: pass
         
-        # --- SCRAPING BPBD (PASAR IKAN) DENGAN RADAR ---
+        # 2. BPBD Scraping (Matrix Bypass Method)
         try:
             driver.get("https://poskobanjir.dsdadki.web.id/")
-            
-            # 1. Tembak baris <tr> utuh milik Pasar Ikan
-            xpath_row = "//tr[contains(@onclick, 'Pasar Ikan')]"
+            # Cari baris yang mengandung 'Pasar Ikan'
             row_el = WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.XPATH, xpath_row))
+                EC.presence_of_element_located((By.XPATH, "//tr[contains(@onclick, 'Pasar Ikan')]"))
             )
-            
-            # 2. Ambil semua elemen kolom <td> di dalam baris tersebut
-            tds = row_el.find_elements(By.TAG_NAME, "td")
-            
-            # 3. Ekstrak teks pakai 'innerText' biar tulisan yang ngumpet tetep ketarik
-            teks_kolom = [td.get_attribute("innerText").strip() for td in tds]
-            
-            # 4. Munculin di sidebar lu isi semua kolomnya buat jaga-jaga
-            st.sidebar.warning(f"DEBUG RADAR: {teks_kolom}")
-            
-            # 5. Auto-Deteksi Angka TMA
-            for teks in teks_kolom:
-                # Cuma sisain angka, titik, dan koma (buang huruf)
-                val_str = ''.join(c for c in teks if c.isdigit() or c in ['.', ','])
-                
-                # Kalau teks aslinya nggak kosong, nggak kepanjangan, dan mengandung angka
-                if val_str and 0 < len(teks) <= 6: 
-                    try:
-                        val = float(val_str.replace(',', '.')) / 100 # Convert cm ke meter
-                        
-                        # Validasi apakah angkanya masuk akal (dibawah batas sensor error)
-                        if 0 < val <= LIMIT_SENSOR_ERROR:
-                            res["bpbd"] = val
-                            break # Angka valid ketemu! Berhenti nyari.
-                    except ValueError:
-                        continue # Kalau gagal convert ke float, skip ke kolom berikutnya
-                        
-        except Exception as e: 
-            st.sidebar.error(f"DEBUG ERROR SCRAPING BPBD:\n{e}")
+            # Sedot atribut onclick
+            script_text = row_el.get_attribute("onclick")
+            # Regex: cari angka setelah "Status : ..., "
+            match = re.search(r'Status[^,]*,(\d+[\.,]?\d*)', script_text)
+            if match:
+                val = float(match.group(1).replace(',', '.')) / 100 # cm ke meter
+                if val <= LIMIT_SENSOR_ERROR: res["bpbd"] = val
+        except: pass
         
         driver.quit()
     except:
@@ -213,88 +169,70 @@ def load_prediction():
 # --- 6. EXECUTION ---
 df_pred, col_tgl, col_val = load_prediction()
 live_data = fetch_all_realtime()
-save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
+
+# Simpan data hanya jika refresh terjadi mendekati interval 15 menit
+if sekarang.minute % 15 == 0:
+    save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
+    save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:
-    # --- LOGIKA ALERT SISTEM ---
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
     
-    # Kumpulkan nilai untuk pengecekan alert
-    check_values = {
-        "Prediksi Model": h_now,
-        "AWS Tj. Priok": live_data['aws'],
-        "Psr. Ikan (BPBD)": live_data['bpbd']
-    }
-    
-    awas_list = [n for n, v in check_values.items() if v is not None and v >= 2.5]
-    waspada_list = [n for n, v in check_values.items() if v is not None and 2.3 <= v < 2.5]
+    # Alert System
+    check_values = {"Prediksi": h_now, "AWS": live_data['aws'], "BPBD": live_data['bpbd']}
+    awas = [n for n, v in check_values.items() if v is not None and v >= 2.5]
+    waspada = [n for n, v in check_values.items() if v is not None and 2.3 <= v < 2.5]
 
-    # Eksekusi Visual & Sound Alert
-    if awas_list:
-        st.error(f"### 🚨 STATUS: AWAS ROB! \n Level air kritis (≥ 2.5m) terdeteksi pada: **{', '.join(awas_list)}**. Segera lakukan tindakan pengamanan!", icon="⚠️")
+    if awas:
+        st.error(f"### 🚨 STATUS: AWAS ROB! ({', '.join(awas)})", icon="⚠️")
         play_audio("AWAS ROB.mp3") 
-    elif waspada_list:
-        st.warning(f"### ⚠️ STATUS: WASPADA ROB! \n Kenaikan air (≥ 2.3m) terdeteksi pada: **{', '.join(waspada_list)}**. Pantau terus perkembangan situasi!", icon="📢")
+    elif waspada:
+        st.warning(f"### ⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
         play_audio("waspada ROB.mp3")
 
-    # Summary Box
+    # Summary
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
-        i_max, i_min = df_h[col_val].idxmax(), df_h[col_val].idxmin()
-        val_max, jam_max = df_h.loc[i_max, col_val], df_h.loc[i_max, col_tgl].strftime("%H:%M")
-        val_min, jam_min = df_h.loc[i_min, col_val], df_h.loc[i_min, col_tgl].strftime("%H:%M")
-        st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {val_max:.2f}m ({jam_max} WIB)</span> | <span style="color: #3b82f6;">▼ MIN: {val_min:.2f}m ({jam_min} WIB)</span></span></div>', unsafe_allow_html=True)
+        val_max, jam_max = df_h[col_val].max(), df_h.loc[df_h[col_val].idxmax(), col_tgl].strftime("%H:%M")
+        val_min, jam_min = df_h[col_val].min(), df_h.loc[df_h[col_val].idxmin(), col_tgl].strftime("%H:%M")
+        st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {val_max:.2f}m ({jam_max})</span> | <span style="color: #3b82f6;">▼ MIN: {val_min:.2f}m ({jam_min})</span></span></div>', unsafe_allow_html=True)
 
     # Metrics
-    diff_aws = (live_data['aws'] - h_now) if live_data['aws'] is not None else None
-    diff_bpbd = (live_data['bpbd'] - h_now) if live_data['bpbd'] is not None else None
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Prediksi (Model)", f"{h_now:.2f} m")
+    m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A")
+    m3.metric("BPBD Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A")
+    m4.metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] > h_now) else "📉 SURUT")
 
-    m_col = st.columns(4)
-    m_col[0].metric("Prediksi (Model)", f"{h_now:.2f} m")
-    m_col[1].metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", 
-                    delta=f"{diff_aws:+.2f} m dr prediksi" if diff_aws is not None else None, delta_color="inverse")
-    m_col[2].metric("TMA Pintu Air Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", 
-                    delta=f"{diff_bpbd:+.2f} m dr prediksi" if diff_bpbd is not None else None, delta_color="inverse")
-    m_col[3].metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] - h_now) > 0.05 else "📉 SURUT")
-
-    # Chart
+    # Plotly Chart
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
-    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', width=2, dash='dot')))
+    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', dash='dot')))
     
-    if not df_plot.empty:
-        idx_daily_max = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmax()
-        idx_daily_min = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmin()
-        for idxs, color, sym, pos in [(idx_daily_max, '#ef4444', 'triangle-up', 'top center'), (idx_daily_min, '#3b82f6', 'triangle-down', 'bottom center')]:
-            df_pts = df_plot.loc[idxs]
-            fig.add_trace(go.Scatter(x=df_pts[col_tgl], y=df_pts[col_val], mode='markers+text', marker=dict(color=color, size=10, symbol=sym), text=[f"{v:.2f}m" for v in df_pts[col_val]], textposition=pos, textfont=dict(color=color, size=11, family="Arial Black"), showlegend=False))
-
+    # Tambahkan History AWS
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
-        dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)]
-        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS Tj. Priok', mode='lines+markers', line=dict(color='#0033cc', width=4)))
+        dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end)]
+        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS (History)', mode='lines+markers', line=dict(color='#0033cc', width=3)))
 
+    # Tambahkan History BPBD
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
-        dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)]
-        fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='Pintu air Psr. Ikan', mode='lines+markers', line=dict(color='#f59e0b', width=4)))
+        dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end)]
+        fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
-    fig.add_shape(type="line", x0=sekarang, x1=sekarang, y0=0, y1=1, yref="paper", line=dict(color="#22c55e", width=3, dash="dash"))
-    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
-    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")
+    fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
+    fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=40, b=10))
+    st.plotly_chart(fig, use_container_width=True)
 
-    fig.update_layout(height=500, template="plotly_white", hovermode="x unified", legend=dict(orientation="h", y=-0.25, x=0), margin=dict(l=10, r=10, t=60, b=100))
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-    # --- 8. FOOTER ---
+    # Footer Download
     st.divider()
     f1, f2, f3 = st.columns(3)
     with f1:
         if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Download AWS", open(FILE_HISTORY_AWS, 'rb'), "history_aws.csv", "text/csv", use_container_width=True)
     with f2:
-        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Download Psr. Ikan", open(FILE_HISTORY_BPBD, 'rb'), "history_bpbd.csv", "text/csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Download BPBD", open(FILE_HISTORY_BPBD, 'rb'), "history_bpbd.csv", "text/csv", use_container_width=True)
     with f3: 
-        if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
+        if st.button("🔄 Force Refresh", use_container_width=True): st.cache_data.clear(); st.rerun()

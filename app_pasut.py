@@ -157,36 +157,43 @@ def fetch_all_realtime():
             if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
         except: pass
         
-        # --- SCRAPING BPBD (PASAR IKAN) DENGAN DEBUGGING ---
+        # --- SCRAPING BPBD (PASAR IKAN) DENGAN RADAR ---
         try:
             driver.get("https://poskobanjir.dsdadki.web.id/")
             
-            # Pakai td[4] menyesuaikan pola ID cell10_4 web tersebut
-            xpath_stabil = "//tr[contains(@onclick, 'Pasar Ikan')]/td[4]"
-            
-            el = WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.XPATH, xpath_stabil))
+            # 1. Tembak baris <tr> utuh milik Pasar Ikan
+            xpath_row = "//tr[contains(@onclick, 'Pasar Ikan')]"
+            row_el = WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.XPATH, xpath_row))
             )
             
-            raw_text = el.text.strip()
+            # 2. Ambil semua elemen kolom <td> di dalam baris tersebut
+            tds = row_el.find_elements(By.TAG_NAME, "td")
             
-            if raw_text:
-                val_str = ''.join(c for c in raw_text if c.isdigit() or c in ['.', ','])
-                val_str = val_str.replace(',', '.')
+            # 3. Ekstrak teks pakai 'innerText' biar tulisan yang ngumpet tetep ketarik
+            teks_kolom = [td.get_attribute("innerText").strip() for td in tds]
+            
+            # 4. Munculin di sidebar lu isi semua kolomnya buat jaga-jaga
+            st.sidebar.warning(f"DEBUG RADAR: {teks_kolom}")
+            
+            # 5. Auto-Deteksi Angka TMA
+            for teks in teks_kolom:
+                # Cuma sisain angka, titik, dan koma (buang huruf)
+                val_str = ''.join(c for c in teks if c.isdigit() or c in ['.', ','])
                 
-                if val_str:
-                    val = float(val_str) / 100 # Convert dari cm ke meter
-                    if val <= LIMIT_SENSOR_ERROR: 
-                        res["bpbd"] = val
-                    else:
-                        st.sidebar.error(f"DEBUG BPBD: Nilai aneh/kebesaran = {val} meter")
-                else:
-                    st.sidebar.error("DEBUG BPBD: Teks berhasil ditarik, tapi angkanya kosong.")
-            else:
-                st.sidebar.error("DEBUG BPBD: Elemen ketemu tapi teksnya kosong/blank.")
-                
+                # Kalau teks aslinya nggak kosong, nggak kepanjangan, dan mengandung angka
+                if val_str and 0 < len(teks) <= 6: 
+                    try:
+                        val = float(val_str.replace(',', '.')) / 100 # Convert cm ke meter
+                        
+                        # Validasi apakah angkanya masuk akal (dibawah batas sensor error)
+                        if 0 < val <= LIMIT_SENSOR_ERROR:
+                            res["bpbd"] = val
+                            break # Angka valid ketemu! Berhenti nyari.
+                    except ValueError:
+                        continue # Kalau gagal convert ke float, skip ke kolom berikutnya
+                        
         except Exception as e: 
-            # Munculin error di sidebar kalau elemen gak ketemu atau timeout
             st.sidebar.error(f"DEBUG ERROR SCRAPING BPBD:\n{e}")
         
         driver.quit()

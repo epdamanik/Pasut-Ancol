@@ -217,21 +217,11 @@ if df_pred is not None:
         st.warning(f"### ⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
         play_audio("waspada ROB.mp3")
 
-    # Summary & Ekstraksi Titik Max/Min Harian
+    # Summary (Khusus info hari ini)
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
-    waktu_max, waktu_min = None, None
     if not df_h.empty:
-        idx_max = df_h[col_val].idxmax()
-        idx_min = df_h[col_val].idxmin()
-        
-        val_max = df_h.loc[idx_max, col_val]
-        waktu_max = df_h.loc[idx_max, col_tgl]
-        jam_max = waktu_max.strftime("%H:%M")
-        
-        val_min = df_h.loc[idx_min, col_val]
-        waktu_min = df_h.loc[idx_min, col_tgl]
-        jam_min = waktu_min.strftime("%H:%M")
-        
+        val_max, jam_max = df_h[col_val].max(), df_h.loc[df_h[col_val].idxmax(), col_tgl].strftime("%H:%M")
+        val_min, jam_min = df_h[col_val].min(), df_h.loc[df_h[col_val].idxmin(), col_tgl].strftime("%H:%M")
         st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {val_max:.2f}m ({jam_max})</span> | <span style="color: #3b82f6;">▼ MIN: {val_min:.2f}m ({jam_min})</span></span></div>', unsafe_allow_html=True)
 
     # Metrics
@@ -259,21 +249,32 @@ if df_pred is not None:
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
-    # [FITUR DIKEMBALIKAN]: Plot Dot Max & Min Harian
-    if waktu_max is not None and waktu_min is not None:
-        # Pastikan dotnya ada di dalam rentang filter tanggal yg dipilih user
-        if t_start <= waktu_max <= t_end:
-            fig.add_trace(go.Scatter(
-                x=[waktu_max], y=[val_max], mode='markers+text',
-                marker=dict(color='red', size=12, symbol='circle', line=dict(color='white', width=2)),
-                name='Max Harian', text=[f"MAX: {val_max:.2f}m"], textposition="top center", textfont=dict(color='red', size=12)
-            ))
-        if t_start <= waktu_min <= t_end:
-            fig.add_trace(go.Scatter(
-                x=[waktu_min], y=[val_min], mode='markers+text',
-                marker=dict(color='blue', size=12, symbol='circle', line=dict(color='white', width=2)),
-                name='Min Harian', text=[f"MIN: {val_min:.2f}m"], textposition="bottom center", textfont=dict(color='blue', size=12)
-            ))
+    # [FITUR DIKEMBALIKAN]: Plot Dot Max & Min Harian untuk SEMUA HARI di rentang waktu
+    if not df_plot.empty:
+        # Kelompokkan data berdasarkan tanggal, lalu cari index nilai max & min di masing-masing tanggal
+        idx_max_harian = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmax()
+        idx_min_harian = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmin()
+        
+        df_max = df_plot.loc[idx_max_harian]
+        df_min = df_plot.loc[idx_min_harian]
+        
+        # Plot Dot Max untuk tiap hari
+        fig.add_trace(go.Scatter(
+            x=df_max[col_tgl], y=df_max[col_val], mode='markers+text',
+            marker=dict(color='red', size=12, symbol='circle', line=dict(color='white', width=2)),
+            name='Max Harian', 
+            text=[f"MAX: {v:.2f}m" for v in df_max[col_val]], 
+            textposition="top center", textfont=dict(color='red', size=12)
+        ))
+        
+        # Plot Dot Min untuk tiap hari
+        fig.add_trace(go.Scatter(
+            x=df_min[col_tgl], y=df_min[col_val], mode='markers+text',
+            marker=dict(color='blue', size=12, symbol='circle', line=dict(color='white', width=2)),
+            name='Min Harian', 
+            text=[f"MIN: {v:.2f}m" for v in df_min[col_val]], 
+            textposition="bottom center", textfont=dict(color='blue', size=12)
+        ))
 
     # Garis vertikal waktu saat ini
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")

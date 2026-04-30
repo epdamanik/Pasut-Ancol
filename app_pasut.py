@@ -128,7 +128,7 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
-        # 1. AWS Scraping
+        # --- SCRAPING AWS ---
         try:
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
@@ -136,21 +136,34 @@ def fetch_all_realtime():
             if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
         except: pass
         
-        # 2. BPBD Scraping (Matrix Bypass Method)
+        # --- SCRAPING BPBD (PASAR IKAN) JALUR BYPASS V2 ---
         try:
             driver.get("https://poskobanjir.dsdadki.web.id/")
-            # Cari baris yang mengandung 'Pasar Ikan'
+            
+            # 1. Tembak baris <tr> milik Pasar Ikan
             row_el = WebDriverWait(driver, 15).until(
                 EC.presence_of_element_located((By.XPATH, "//tr[contains(@onclick, 'Pasar Ikan')]"))
             )
-            # Sedot atribut onclick
+            
+            # 2. Sedot isi atribut 'onclick'
             script_text = row_el.get_attribute("onclick")
-            # Regex: cari angka setelah "Status : ..., "
-            match = re.search(r'Status[^,]*,(\d+[\.,]?\d*)', script_text)
+            
+            # 3. REGEX BARU: Ngambil argumen ke-2 dari dalam kurung ShowPopup (TMA dalam milimeter)
+            match = re.search(r"ShowPopup\('[^']*',\s*'(\d+)'", script_text)
+            
             if match:
-                val = float(match.group(1).replace(',', '.')) / 100 # cm ke meter
-                if val <= LIMIT_SENSOR_ERROR: res["bpbd"] = val
-        except: pass
+                # Angka ditarik dalam satuan Milimeter, dibagi 1000 biar jadi Meter
+                val = float(match.group(1)) / 1000 
+                
+                if val <= LIMIT_SENSOR_ERROR:
+                    res["bpbd"] = val
+                else:
+                    st.sidebar.error(f"DEBUG BPBD: Angka kebesaran = {val}m")
+            else:
+                st.sidebar.error("DEBUG BPBD: Gagal narik angka dari Regex.")
+                
+        except Exception as e: 
+            st.sidebar.error(f"DEBUG ERROR SCRAPING BPBD:\n{e}")
         
         driver.quit()
     except:
@@ -201,8 +214,8 @@ if df_pred is not None:
     # Metrics
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Prediksi (Model)", f"{h_now:.2f} m")
-    m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A")
-    m3.metric("BPBD Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A")
+    m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m dr prediksi" if live_data['aws'] else None, delta_color="inverse")
+    m3.metric("BPBD Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
     m4.metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] > h_now) else "📉 SURUT")
 
     # Plotly Chart
@@ -224,7 +237,9 @@ if df_pred is not None:
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
-    fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=40, b=10))
+    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
+    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")
+    fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=40, b=10), hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
     # Footer Download

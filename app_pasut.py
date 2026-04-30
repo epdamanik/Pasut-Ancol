@@ -59,7 +59,7 @@ with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     st.divider()
-    st.info("Sistem menyimpan data AWS tiap 15 menit. Data BPBD ditarik pada menit :15 dan :45 untuk mencatat data menit :00 dan :30.")
+    st.info("Sistem menyimpan data AWS tiap 15 menit. Data Pintu air Pasar Ikan ditarik pada menit :15 dan :45 untuk mencatat data menit :00 dan :30.")
 
 # --- 4. HEADER ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 

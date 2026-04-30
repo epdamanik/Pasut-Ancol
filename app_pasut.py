@@ -157,12 +157,12 @@ def fetch_all_realtime():
             if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
         except: pass
         
-        # --- SCRAPING BPBD (PASAR IKAN) TERBARU ---
+        # --- SCRAPING BPBD (PASAR IKAN) DENGAN DEBUGGING ---
         try:
             driver.get("https://poskobanjir.dsdadki.web.id/")
             
-            # Logika XPath dinamis mencari baris berdasarkan onclick
-            xpath_stabil = "//tr[contains(@onclick, 'Pasar Ikan')]/td[5]"
+            # Pakai td[4] menyesuaikan pola ID cell10_4 web tersebut
+            xpath_stabil = "//tr[contains(@onclick, 'Pasar Ikan')]/td[4]"
             
             el = WebDriverWait(driver, 15).until(
                 EC.presence_of_element_located((By.XPATH, xpath_stabil))
@@ -171,14 +171,23 @@ def fetch_all_realtime():
             raw_text = el.text.strip()
             
             if raw_text:
-                # Filter supaya cuma ambil angka, titik, atau koma
                 val_str = ''.join(c for c in raw_text if c.isdigit() or c in ['.', ','])
                 val_str = val_str.replace(',', '.')
                 
                 if val_str:
                     val = float(val_str) / 100 # Convert dari cm ke meter
-                    if val <= LIMIT_SENSOR_ERROR: res["bpbd"] = val
-        except: pass
+                    if val <= LIMIT_SENSOR_ERROR: 
+                        res["bpbd"] = val
+                    else:
+                        st.sidebar.error(f"DEBUG BPBD: Nilai aneh/kebesaran = {val} meter")
+                else:
+                    st.sidebar.error("DEBUG BPBD: Teks berhasil ditarik, tapi angkanya kosong.")
+            else:
+                st.sidebar.error("DEBUG BPBD: Elemen ketemu tapi teksnya kosong/blank.")
+                
+        except Exception as e: 
+            # Munculin error di sidebar kalau elemen gak ketemu atau timeout
+            st.sidebar.error(f"DEBUG ERROR SCRAPING BPBD:\n{e}")
         
         driver.quit()
     except:

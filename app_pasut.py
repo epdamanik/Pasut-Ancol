@@ -17,9 +17,8 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # --- 0. SMART AUTO REFRESH (Sync tiap 15 Menit) ---
 now_sync = datetime.now()
-# Menghitung detik menuju menit ke 00, 15, 30, atau 45 terdekat
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
-if seconds_to_next <= 0: seconds_to_next = 900 # Default 15 menit kalau hitungan slip
+if seconds_to_next <= 0: seconds_to_next = 900 
 st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 
 # --- 1. KONFIGURASI HALAMAN ---
@@ -80,7 +79,7 @@ st.divider()
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
-LIMIT_SENSOR_ERROR = 3.5 # Batas maksimal nilai masuk akal
+LIMIT_SENSOR_ERROR = 3.5 
 
 def play_audio(file_path):
     if os.path.exists(file_path):
@@ -91,14 +90,10 @@ def play_audio(file_path):
             st.components.v1.html(audio_html, height=0)
 
 def save_to_csv(filename, waktu, nilai):
-    # Lapis Pertahanan 2: Tolak nilai spike saat mau di-save ke CSV
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
-    
-    # Pembulatan waktu ke interval 15 menit terdekat (00, 15, 30, 45)
     menit_bulat = (waktu.minute // 15) * 15
     waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
     waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
-
     new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
     
     if not os.path.exists(filename):
@@ -106,13 +101,13 @@ def save_to_csv(filename, waktu, nilai):
     else:
         try:
             old_data = pd.read_csv(filename)
-            # Timpa kalau ada waktu yang sama biar gak dobel
             old_data = old_data[old_data['waktu'] != waktu_str]
             combined = pd.concat([old_data, new_data]).sort_values('waktu')
             combined.to_csv(filename, index=False)
         except: pass
 
-@st.cache_data(ttl=800)
+# --- TARGET 1: UBAH TTL JADI 900 DETIK (15 MENIT) ---
+@st.cache_data(ttl=900)
 def fetch_all_realtime():
     options = Options()
     options.add_argument("--headless")
@@ -128,38 +123,25 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
-        # --- SCRAPING AWS ---
         try:
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
             val = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
-            
-            # Lapis Pertahanan 1 (AWS): Cek limit sebelum masuk dashboard
             if val <= LIMIT_SENSOR_ERROR: 
                 res["aws"] = val
             else:
                 st.sidebar.error(f"DEBUG AWS: Terdeteksi SPIKE ERROR = {val}m (Dibuang)")
         except: pass
         
-        # --- SCRAPING BPBD (PASAR IKAN) JALUR BYPASS V2 ---
         try:
             driver.get("https://poskobanjir.dsdadki.web.id/")
-            
-            # 1. Tembak baris <tr> milik Pasar Ikan
             row_el = WebDriverWait(driver, 15).until(
                 EC.presence_of_element_located((By.XPATH, "//tr[contains(@onclick, 'Pasar Ikan')]"))
             )
-            
-            # 2. Sedot isi atribut 'onclick'
             script_text = row_el.get_attribute("onclick")
-            
-            # 3. REGEX BARU: Ngambil argumen ke-2 dari dalam kurung ShowPopup (TMA dalam milimeter)
             match = re.search(r"ShowPopup\('[^']*',\s*'(\d+)'", script_text)
-            
             if match:
                 val = float(match.group(1)) / 1000 
-                
-                # Lapis Pertahanan 1 (BPBD): Cek limit sebelum masuk dashboard
                 if val <= LIMIT_SENSOR_ERROR:
                     res["bpbd"] = val
                 else:
@@ -188,16 +170,12 @@ def load_prediction():
 df_pred, col_tgl, col_val = load_prediction()
 live_data = fetch_all_realtime()
 
-# Ambil angka menit saat script tereksekusi
 menit = sekarang.minute
 
-# 1. Simpan data AWS setiap 15 menit (00, 15, 30, 45) secara normal
 if menit in [0, 15, 30, 45]:
     save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
 
-# 2. Simpan data BPBD HANYA ditarik pada menit 15 dan 45
 if menit in [15, 45]:
-    # Mundurin waktu 15 menit ke belakang. 
     waktu_bpbd_mundur = sekarang - timedelta(minutes=15)
     save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd_mundur, live_data["bpbd"])
 
@@ -205,7 +183,6 @@ if menit in [15, 45]:
 if df_pred is not None:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
     
-    # Alert System
     check_values = {"Prediksi": h_now, "AWS": live_data['aws'], "BPBD": live_data['bpbd']}
     awas = [n for n, v in check_values.items() if v is not None and v >= 2.5]
     waspada = [n for n, v in check_values.items() if v is not None and 2.3 <= v < 2.5]
@@ -217,48 +194,40 @@ if df_pred is not None:
         st.warning(f"### ⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
         play_audio("waspada ROB.mp3")
 
-    # Summary (Khusus info hari ini)
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         val_max, jam_max = df_h[col_val].max(), df_h.loc[df_h[col_val].idxmax(), col_tgl].strftime("%H:%M")
         val_min, jam_min = df_h[col_val].min(), df_h.loc[df_h[col_val].idxmin(), col_tgl].strftime("%H:%M")
         st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {val_max:.2f}m ({jam_max})</span> | <span style="color: #3b82f6;">▼ MIN: {val_min:.2f}m ({jam_min})</span></span></div>', unsafe_allow_html=True)
 
-    # Metrics
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Prediksi (Model)", f"{h_now:.2f} m")
     m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m dr prediksi" if live_data['aws'] else None, delta_color="inverse")
     m3.metric("BPBD Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
     m4.metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] > h_now) else "📉 SURUT")
 
-    # Plotly Chart
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', dash='dot')))
     
-    # Tambahkan History AWS
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS (History)', mode='lines+markers', line=dict(color='#0033cc', width=3)))
 
-    # Tambahkan History BPBD
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
-    # [FITUR DIKEMBALIKAN]: Plot Dot Max & Min Harian untuk SEMUA HARI di rentang waktu
     if not df_plot.empty:
-        # Kelompokkan data berdasarkan tanggal, lalu cari index nilai max & min di masing-masing tanggal
         idx_max_harian = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmax()
         idx_min_harian = df_plot.groupby(df_plot[col_tgl].dt.date)[col_val].idxmin()
         
         df_max = df_plot.loc[idx_max_harian]
         df_min = df_plot.loc[idx_min_harian]
         
-        # Plot Dot Max untuk tiap hari
         fig.add_trace(go.Scatter(
             x=df_max[col_tgl], y=df_max[col_val], mode='markers+text',
             marker=dict(color='red', size=12, symbol='circle', line=dict(color='white', width=2)),
@@ -267,7 +236,6 @@ if df_pred is not None:
             textposition="top center", textfont=dict(color='red', size=12)
         ))
         
-        # Plot Dot Min untuk tiap hari
         fig.add_trace(go.Scatter(
             x=df_min[col_tgl], y=df_min[col_val], mode='markers+text',
             marker=dict(color='blue', size=12, symbol='circle', line=dict(color='white', width=2)),
@@ -276,10 +244,8 @@ if df_pred is not None:
             textposition="bottom center", textfont=dict(color='blue', size=12)
         ))
 
-    # Garis vertikal waktu saat ini
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
     
-    # Tambahin Teks Anotasi manual waktu saat ini
     teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
     fig.add_annotation(
         x=sekarang, y=1, yref="paper", text=teks_waktu, showarrow=False,
@@ -291,7 +257,6 @@ if df_pred is not None:
     fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=40, b=10), hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
-    # Footer Download
     st.divider()
     f1, f2, f3 = st.columns(3)
     with f1:

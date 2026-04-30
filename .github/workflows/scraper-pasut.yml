@@ -2,8 +2,9 @@ name: Auto Scraper TMA Priok
 
 on:
   schedule:
-    - cron: '*/15 * * * *' 
-  workflow_dispatch: 
+    # Berjalan otomatis setiap 15 menit
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,7 +13,7 @@ jobs:
   scrape-data:
     runs-on: ubuntu-latest
     
-    # --- INI OBAT BUAT NGILANGIN WARNING NODE.JS 20 ---
+    # Menghilangkan warning Node.js
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     
@@ -27,7 +28,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install selenium webdriver-manager pandas pytz
+          pip install selenium webdriver-manager pandas pytz openpyxl
 
       - name: Eksekusi Background Scraper
         run: python scraper_khusus.py 

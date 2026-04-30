@@ -135,7 +135,21 @@ if df_pred is not None and not df_pred.empty:
     m1.metric("Prediksi (Model)", f"{h_now:.2f} m")
     m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m dr prediksi" if live_data['aws'] else None, delta_color="inverse")
     m3.metric("BPBD Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
-    m4.metric("Tren", "📈 PASANG" if (df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val] > h_now) else "📉 SURUT")
+    
+    # --- LOGIKA TREN (2 Jam ke Depan + Stagnan) ---
+    waktu_target = sekarang + timedelta(hours=2)
+    h_next = df_pred.loc[(df_pred[col_tgl] - waktu_target).abs().idxmin(), col_val]
+    selisih = h_next - h_now
+    threshold = 0.02 # Threshold 2 cm
+
+    if abs(selisih) < threshold:
+        tren_status = "↔️ STAGNAN"
+    elif selisih > 0:
+        tren_status = "📈 PASANG"
+    else:
+        tren_status = "📉 SURUT"
+    
+    m4.metric("Tren", tren_status)
 
     # --- PLOTLY CHART ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())

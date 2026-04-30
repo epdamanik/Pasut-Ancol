@@ -59,7 +59,7 @@ with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     st.divider()
-    st.info("Sistem akan menyimpan data otomatis setiap interval 15 menit (00, 15, 30, 45).")
+    st.info("Sistem menyimpan data AWS tiap 15 menit. Data BPBD ditarik pada menit :15 dan :45 untuk mencatat data menit :00 dan :30.")
 
 # --- 4. HEADER ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
@@ -91,7 +91,6 @@ def play_audio(file_path):
             st.components.v1.html(audio_html, height=0)
 
 def save_to_csv(filename, waktu, nilai):
-    """Menyimpan data tepat pada interval 15 menit"""
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
     
     # Pembulatan waktu ke interval 15 menit terdekat (00, 15, 30, 45)
@@ -183,10 +182,20 @@ def load_prediction():
 df_pred, col_tgl, col_val = load_prediction()
 live_data = fetch_all_realtime()
 
-# Simpan data hanya jika refresh terjadi mendekati interval 15 menit
-if sekarang.minute % 15 == 0:
+# Ambil angka menit saat script tereksekusi
+menit = sekarang.minute
+
+# 1. Simpan data AWS setiap 15 menit (00, 15, 30, 45) secara normal
+if menit in [0, 15, 30, 45]:
     save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-    save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
+
+# 2. Simpan data BPBD HANYA ditarik pada menit 15 dan 45
+if menit in [15, 45]:
+    # Mundurin waktu 15 menit ke belakang. 
+    # Kalau ditarik pas 14:15 -> akan tercatat di CSV sebagai 14:00
+    # Kalau ditarik pas 14:45 -> akan tercatat di CSV sebagai 14:30
+    waktu_bpbd_mundur = sekarang - timedelta(minutes=15)
+    save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd_mundur, live_data["bpbd"])
 
 # --- 7. DISPLAY ---
 if df_pred is not None:

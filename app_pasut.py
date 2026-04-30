@@ -181,9 +181,21 @@ if df_pred is not None and not df_pred.empty:
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
-    # Garis Waktu Saat Ini
-    fig.add_vline(x=sekarang.timestamp() * 1000, line_width=2, line_dash="dash", line_color="green")
-    fig.add_annotation(x=sekarang.timestamp() * 1000, y=1, yref="paper", text=f"<b>Saat Ini ({sekarang.strftime('%H:%M')})</b>", showarrow=False, font=dict(color="green"), xanchor="left", xshift=5)
+    # Garis vertikal waktu saat ini (KEMBALI KE ASLI)
+    fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
+    
+    # Tambahin Teks Anotasi manual (KEMBALI KE ASLI)
+    teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
+    fig.add_annotation(
+        x=sekarang,
+        y=1,             
+        yref="paper",    
+        text=teks_waktu,
+        showarrow=False,
+        font=dict(color="green", size=12),
+        xanchor="left",  
+        xshift=5         
+    )
     
     fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
     fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")

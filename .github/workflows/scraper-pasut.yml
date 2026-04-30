@@ -2,20 +2,25 @@ name: Auto Scraper TMA Priok
 
 on:
   schedule:
-    # Jalan otomatis setiap 15 menit
     - cron: '*/15 * * * *' 
   workflow_dispatch: 
+
+# --- INI SURAT IZIN SAKTINYA BIAR GAK ERROR 128 ---
+permissions:
+  contents: write
 
 jobs:
   scrape-data:
     runs-on: ubuntu-latest
     
     steps:
+      # --- UPGRADE KE v4 BIAR WARNING NODE.JS HILANG ---
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # --- UPGRADE KE v5 ---
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
@@ -31,6 +36,5 @@ jobs:
           git config --global user.name "Bot-Stamar-Priok"
           git config --global user.email "bot@github.com"
           git add history_aws_priok.csv history_bpbd_pasarikan.csv
-          # Exit 0 agar tidak error jika tidak ada perubahan data
           git commit -m "Auto-update data TMA [skip ci]" || exit 0
           git push

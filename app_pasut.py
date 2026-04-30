@@ -174,7 +174,7 @@ if df_pred is not None and not df_pred.empty:
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'], format='mixed', errors='coerce')
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
-        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS (History)', mode='lines+markers', line=dict(color='#0033cc', width=3)))
+        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS (History)', mode='lines+markers', line=dict(color='#7c3aed', width=3)))
 
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'], format='mixed', errors='coerce')

@@ -80,7 +80,7 @@ st.divider()
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
-LIMIT_SENSOR_ERROR = 3.5 
+LIMIT_SENSOR_ERROR = 3.5 # Batas maksimal nilai masuk akal
 
 def play_audio(file_path):
     if os.path.exists(file_path):
@@ -91,6 +91,7 @@ def play_audio(file_path):
             st.components.v1.html(audio_html, height=0)
 
 def save_to_csv(filename, waktu, nilai):
+    # Lapis Pertahanan 2: Tolak nilai spike saat mau di-save ke CSV
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
     
     # Pembulatan waktu ke interval 15 menit terdekat (00, 15, 30, 45)
@@ -132,7 +133,12 @@ def fetch_all_realtime():
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
             val = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
-            if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
+            
+            # Lapis Pertahanan 1 (AWS): Cek limit sebelum masuk dashboard
+            if val <= LIMIT_SENSOR_ERROR: 
+                res["aws"] = val
+            else:
+                st.sidebar.error(f"DEBUG AWS: Terdeteksi SPIKE ERROR = {val}m (Dibuang)")
         except: pass
         
         # --- SCRAPING BPBD (PASAR IKAN) JALUR BYPASS V2 ---
@@ -151,13 +157,13 @@ def fetch_all_realtime():
             match = re.search(r"ShowPopup\('[^']*',\s*'(\d+)'", script_text)
             
             if match:
-                # Angka ditarik dalam satuan Milimeter, dibagi 1000 biar jadi Meter
                 val = float(match.group(1)) / 1000 
                 
+                # Lapis Pertahanan 1 (BPBD): Cek limit sebelum masuk dashboard
                 if val <= LIMIT_SENSOR_ERROR:
                     res["bpbd"] = val
                 else:
-                    st.sidebar.error(f"DEBUG BPBD: Angka kebesaran = {val}m")
+                    st.sidebar.error(f"DEBUG BPBD: Terdeteksi SPIKE ERROR = {val}m (Dibuang)")
             else:
                 st.sidebar.error("DEBUG BPBD: Gagal narik angka dari Regex.")
                 
@@ -192,8 +198,6 @@ if menit in [0, 15, 30, 45]:
 # 2. Simpan data BPBD HANYA ditarik pada menit 15 dan 45
 if menit in [15, 45]:
     # Mundurin waktu 15 menit ke belakang. 
-    # Kalau ditarik pas 14:15 -> akan tercatat di CSV sebagai 14:00
-    # Kalau ditarik pas 14:45 -> akan tercatat di CSV sebagai 14:30
     waktu_bpbd_mundur = sekarang - timedelta(minutes=15)
     save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd_mundur, live_data["bpbd"])
 
@@ -233,33 +237,32 @@ if df_pred is not None:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', dash='dot')))
     
-    # Tambahkan History AWS
+    # Tambahkan History AWS (Lapis Pertahanan 3: Filter <= LIMIT_SENSOR_ERROR)
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
-        dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end)]
+        dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS (History)', mode='lines+markers', line=dict(color='#0033cc', width=3)))
 
-    # Tambahkan History BPBD
+    # Tambahkan History BPBD (Lapis Pertahanan 3: Filter <= LIMIT_SENSOR_ERROR)
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
-        dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end)]
+        dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
-    # --- PERBAIKAN: Pisah Garis dan Teks ---
-    # 1. Bikin Garis vertikal waktu saat ini (Tanpa teks)
+    # Garis vertikal waktu saat ini (Tanpa teks)
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
     
-    # 2. Tambahin Teks Anotasi manual (Biar nggak error datetime)
+    # Tambahin Teks Anotasi manual
     teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
     fig.add_annotation(
         x=sekarang,
-        y=1,             # Posisi Y di paling atas grafik (100%)
-        yref="paper",    # Patokan koordinat dihitung dari kanvas
+        y=1,             
+        yref="paper",    
         text=teks_waktu,
         showarrow=False,
         font=dict(color="green", size=12),
-        xanchor="left",  # Teks rata kiri biar nggak numpuk tepat di garis
-        xshift=5         # Geser dikit ke kanan
+        xanchor="left",  
+        xshift=5         
     )
     
     fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")

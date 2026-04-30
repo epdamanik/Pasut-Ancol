@@ -149,6 +149,7 @@ def fetch_all_realtime():
             options.binary_location = "/usr/bin/chromium"
             driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
         
+        # --- SCRAPING AWS ---
         try:
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
@@ -156,15 +157,27 @@ def fetch_all_realtime():
             if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
         except: pass
         
+        # --- SCRAPING BPBD (PASAR IKAN) TERBARU ---
         try:
             driver.get("https://poskobanjir.dsdadki.web.id/")
+            
+            # Logika XPath dinamis mencari baris berdasarkan onclick
+            xpath_stabil = "//tr[contains(@onclick, 'Pasar Ikan')]/td[5]"
+            
             el = WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_CtrlDataTinggiAir_GridListPintuAir_cell10_4_ASPxLabel1_10"))
+                EC.presence_of_element_located((By.XPATH, xpath_stabil))
             )
-            val_str = el.text.strip()
-            if val_str:
-                val = float(val_str) / 100
-                if val <= LIMIT_SENSOR_ERROR: res["bpbd"] = val
+            
+            raw_text = el.text.strip()
+            
+            if raw_text:
+                # Filter supaya cuma ambil angka, titik, atau koma
+                val_str = ''.join(c for c in raw_text if c.isdigit() or c in ['.', ','])
+                val_str = val_str.replace(',', '.')
+                
+                if val_str:
+                    val = float(val_str) / 100 # Convert dari cm ke meter
+                    if val <= LIMIT_SENSOR_ERROR: res["bpbd"] = val
         except: pass
         
         driver.quit()

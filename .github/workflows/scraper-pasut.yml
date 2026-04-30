@@ -1,0 +1,36 @@
+name: Auto Scraper TMA Priok
+
+on:
+  schedule:
+    # Jalan otomatis setiap 15 menit
+    - cron: '*/15 * * * *' 
+  workflow_dispatch: 
+
+jobs:
+  scrape-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          pip install selenium webdriver-manager pandas pytz
+
+      - name: Eksekusi Background Scraper
+        run: python scraper_khusus.py 
+
+      - name: Commit dan Push Hasil CSV ke Repo
+        run: |
+          git config --global user.name "Bot-Stamar-Priok"
+          git config --global user.email "bot@github.com"
+          git add history_aws_priok.csv history_bpbd_pasarikan.csv
+          # Exit 0 agar tidak error jika tidak ada perubahan data
+          git commit -m "Auto-update data TMA [skip ci]" || exit 0
+          git push

@@ -217,11 +217,21 @@ if df_pred is not None:
         st.warning(f"### ⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
         play_audio("waspada ROB.mp3")
 
-    # Summary
+    # Summary & Ekstraksi Titik Max/Min Harian
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
+    waktu_max, waktu_min = None, None
     if not df_h.empty:
-        val_max, jam_max = df_h[col_val].max(), df_h.loc[df_h[col_val].idxmax(), col_tgl].strftime("%H:%M")
-        val_min, jam_min = df_h[col_val].min(), df_h.loc[df_h[col_val].idxmin(), col_tgl].strftime("%H:%M")
+        idx_max = df_h[col_val].idxmax()
+        idx_min = df_h[col_val].idxmin()
+        
+        val_max = df_h.loc[idx_max, col_val]
+        waktu_max = df_h.loc[idx_max, col_tgl]
+        jam_max = waktu_max.strftime("%H:%M")
+        
+        val_min = df_h.loc[idx_min, col_val]
+        waktu_min = df_h.loc[idx_min, col_tgl]
+        jam_min = waktu_min.strftime("%H:%M")
+        
         st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {val_max:.2f}m ({jam_max})</span> | <span style="color: #3b82f6;">▼ MIN: {val_min:.2f}m ({jam_min})</span></span></div>', unsafe_allow_html=True)
 
     # Metrics
@@ -237,32 +247,42 @@ if df_pred is not None:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', dash='dot')))
     
-    # Tambahkan History AWS (Lapis Pertahanan 3: Filter <= LIMIT_SENSOR_ERROR)
+    # Tambahkan History AWS
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'])
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS (History)', mode='lines+markers', line=dict(color='#0033cc', width=3)))
 
-    # Tambahkan History BPBD (Lapis Pertahanan 3: Filter <= LIMIT_SENSOR_ERROR)
+    # Tambahkan History BPBD
     if os.path.exists(FILE_HISTORY_BPBD):
         dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'])
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)]
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
-    # Garis vertikal waktu saat ini (Tanpa teks)
+    # [FITUR DIKEMBALIKAN]: Plot Dot Max & Min Harian
+    if waktu_max is not None and waktu_min is not None:
+        # Pastikan dotnya ada di dalam rentang filter tanggal yg dipilih user
+        if t_start <= waktu_max <= t_end:
+            fig.add_trace(go.Scatter(
+                x=[waktu_max], y=[val_max], mode='markers+text',
+                marker=dict(color='red', size=12, symbol='circle', line=dict(color='white', width=2)),
+                name='Max Harian', text=[f"MAX: {val_max:.2f}m"], textposition="top center", textfont=dict(color='red', size=12)
+            ))
+        if t_start <= waktu_min <= t_end:
+            fig.add_trace(go.Scatter(
+                x=[waktu_min], y=[val_min], mode='markers+text',
+                marker=dict(color='blue', size=12, symbol='circle', line=dict(color='white', width=2)),
+                name='Min Harian', text=[f"MIN: {val_min:.2f}m"], textposition="bottom center", textfont=dict(color='blue', size=12)
+            ))
+
+    # Garis vertikal waktu saat ini
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
     
-    # Tambahin Teks Anotasi manual
+    # Tambahin Teks Anotasi manual waktu saat ini
     teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
     fig.add_annotation(
-        x=sekarang,
-        y=1,             
-        yref="paper",    
-        text=teks_waktu,
-        showarrow=False,
-        font=dict(color="green", size=12),
-        xanchor="left",  
-        xshift=5         
+        x=sekarang, y=1, yref="paper", text=teks_waktu, showarrow=False,
+        font=dict(color="green", size=12), xanchor="left", xshift=5         
     )
     
     fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")

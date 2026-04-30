@@ -5,15 +5,7 @@ from datetime import datetime, timedelta
 import pytz  
 from streamlit_autorefresh import st_autorefresh
 import os
-import time
-import re
 import base64
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 # --- 0. SMART AUTO REFRESH (Sync tiap 15 Menit) ---
 now_sync = datetime.now()
@@ -58,7 +50,7 @@ with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     st.divider()
-    st.info("Sistem menyimpan data AWS tiap 15 menit. Data Pintu air Pasar Ikan ditarik pada menit :15 dan :45 untuk mencatat data menit :00 dan :30.")
+    st.info("Sistem diupdate otomatis oleh Robot GitHub tiap 15 menit. Anti-lemot & Anti-crash.")
 
 # --- 4. HEADER ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
@@ -89,73 +81,15 @@ def play_audio(file_path):
             audio_html = f'<audio autoplay><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
             st.components.v1.html(audio_html, height=0)
 
-def save_to_csv(filename, waktu, nilai):
-    if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
-    menit_bulat = (waktu.minute // 15) * 15
-    waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
-    waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
-    new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
-    
-    if not os.path.exists(filename):
-        new_data.to_csv(filename, index=False)
-    else:
+# FUNGSI BARU: Langsung narik angka terakhir dari CSV yang dibikin robot
+def get_latest_from_csv(filename):
+    if os.path.exists(filename):
         try:
-            old_data = pd.read_csv(filename)
-            old_data = old_data[old_data['waktu'] != waktu_str]
-            combined = pd.concat([old_data, new_data]).sort_values('waktu')
-            combined.to_csv(filename, index=False)
+            df = pd.read_csv(filename)
+            if not df.empty:
+                return float(df.iloc[-1]['nilai'])
         except: pass
-
-# --- TARGET 1: UBAH TTL JADI 900 DETIK (15 MENIT) ---
-@st.cache_data(ttl=900)
-def fetch_all_realtime():
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    driver = None
-    res = {"aws": None, "bpbd": None}
-    try:
-        if os.name == 'nt':
-            from webdriver_manager.chrome import ChromeDriverManager
-            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        else:
-            options.binary_location = "/usr/bin/chromium"
-            driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
-        
-        try:
-            driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
-            el = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "waterlevel")))
-            val = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
-            if val <= LIMIT_SENSOR_ERROR: 
-                res["aws"] = val
-            else:
-                st.sidebar.error(f"DEBUG AWS: Terdeteksi SPIKE ERROR = {val}m (Dibuang)")
-        except: pass
-        
-        try:
-            driver.get("https://poskobanjir.dsdadki.web.id/")
-            row_el = WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.XPATH, "//tr[contains(@onclick, 'Pasar Ikan')]"))
-            )
-            script_text = row_el.get_attribute("onclick")
-            match = re.search(r"ShowPopup\('[^']*',\s*'(\d+)'", script_text)
-            if match:
-                val = float(match.group(1)) / 1000 
-                if val <= LIMIT_SENSOR_ERROR:
-                    res["bpbd"] = val
-                else:
-                    st.sidebar.error(f"DEBUG BPBD: Terdeteksi SPIKE ERROR = {val}m (Dibuang)")
-            else:
-                st.sidebar.error("DEBUG BPBD: Gagal narik angka dari Regex.")
-                
-        except Exception as e: 
-            st.sidebar.error(f"DEBUG ERROR SCRAPING BPBD:\n{e}")
-        
-        driver.quit()
-    except:
-        if driver: driver.quit()
-    return res
+    return None
 
 @st.cache_data(ttl=3600)
 def load_prediction():
@@ -168,16 +102,12 @@ def load_prediction():
 
 # --- 6. EXECUTION ---
 df_pred, col_tgl, col_val = load_prediction()
-live_data = fetch_all_realtime()
 
-menit = sekarang.minute
-
-if menit in [0, 15, 30, 45]:
-    save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-
-if menit in [15, 45]:
-    waktu_bpbd_mundur = sekarang - timedelta(minutes=15)
-    save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd_mundur, live_data["bpbd"])
+# HORE! Nggak perlu Selenium lagi, cukup baca CSV terbaru
+live_data = {
+    "aws": get_latest_from_csv(FILE_HISTORY_AWS),
+    "bpbd": get_latest_from_csv(FILE_HISTORY_BPBD)
+}
 
 # --- 7. DISPLAY ---
 if df_pred is not None:

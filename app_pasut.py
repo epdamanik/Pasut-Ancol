@@ -9,7 +9,7 @@ import os
 st.set_page_config(page_title="Dashboard TMA", layout="wide")
 
 # --- VARIABEL GLOBAL ---
-LIMIT_SENSOR_ERROR = 3.45
+LIMIT_SENSOR_ERROR = 3.2
 FILE_HISTORY_AWS = 'history_aws_priok.csv'
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
 FILE_PREDIKSI = 'Data_Pasut_Jam-jaman.csv'
@@ -30,6 +30,7 @@ st.markdown("""
     .metric-value { font-size: 24px; font-weight: bold; color: #111; }
     .metric-delta { font-size: 12px; color: #28a745; }
     .metric-delta.negative { color: #dc3545; }
+    @keyframes blinker { 50% { opacity: 0; } }
 </style>
 """, unsafe_allow_html=True)
 
@@ -38,7 +39,7 @@ def get_latest_from_csv(file_path):
     if not os.path.exists(file_path):
         return None, None
     try:
-        # Baju Zirah untuk baca baris terakhir walau file agak berantakan
+        # Baju Zirah anti Excel
         df = pd.read_csv(file_path)
         if df.empty: return None, None
         df['waktu'] = pd.to_datetime(df['waktu'], format='mixed', errors='coerce')
@@ -55,7 +56,7 @@ sekarang = datetime.now(TZ_WIB)
 t_start = sekarang - timedelta(days=3)
 t_end = sekarang + timedelta(days=4)
 
-# Buat timezone-naive untuk Plotly & Pandas perbandingan
+# Buat timezone-naive untuk Plotly & Pandas
 now_naive = sekarang.replace(tzinfo=None)
 start_naive = t_start.replace(tzinfo=None)
 end_naive = t_end.replace(tzinfo=None)
@@ -77,7 +78,7 @@ df_pred = load_prediksi()
 _, nilai_aws = get_latest_from_csv(FILE_HISTORY_AWS)
 _, nilai_bpbd = get_latest_from_csv(FILE_HISTORY_BPBD)
 
-# Hitung nilai prediksi terdekat dengan waktu saat ini
+# Hitung nilai prediksi terdekat
 nilai_pred_now = None
 if not df_pred.empty:
     terdekat = df_pred.iloc[(df_pred['waktu'] - now_naive).abs().argsort()[:1]]
@@ -87,6 +88,29 @@ if not df_pred.empty:
 # --- UI HEADER ---
 st.markdown("## 🌊 Dashboard Pemantauan TMA Jakarta Utara")
 st.markdown(f"**Update Terakhir:** {sekarang.strftime('%d %b %Y, %H:%M WIB')}")
+
+# --- SISTEM PERINGATAN DINI (ALARM VISUAL & AUDIO) ---
+# Cek nilai tertinggi saat ini dari kedua sensor
+max_now = max([v for v in [nilai_aws, nilai_bpbd] if v is not None] or [0])
+
+if max_now >= 2.50:
+    st.markdown("""
+    <div style="background-color: #dc3545; color: white; padding: 15px; text-align: center; font-size: 22px; font-weight: bold; border-radius: 10px; animation: blinker 1s linear infinite; margin-bottom: 20px;">
+        🚨 BAHAYA: TINGGI MUKA AIR MENCAPAI LEVEL AWAS ROB! 🚨
+    </div>
+    <audio autoplay loop>
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+    </audio>
+    """, unsafe_allow_html=True)
+elif max_now >= 2.30:
+    st.markdown("""
+    <div style="background-color: #f59e0b; color: white; padding: 15px; text-align: center; font-size: 20px; font-weight: bold; border-radius: 10px; margin-bottom: 20px;">
+        ⚠️ PERINGATAN: TINGGI MUKA AIR MENCAPAI LEVEL WASPADA! ⚠️
+    </div>
+    <audio autoplay>
+        <source src="https://assets.mixkit.co/active_storage/sfx/2868/2868-preview.mp3" type="audio/mpeg">
+    </audio>
+    """, unsafe_allow_html=True)
 
 # --- METRIK KARTU ---
 col1, col2, col3, col4 = st.columns(4)
@@ -144,11 +168,11 @@ if not df_pred.empty:
         line=dict(color='#6c757d', width=2, dash='dot')
     ))
 
-# 2. Plot History AWS (Dengan Baju Zirah anti Excel)
+# 2. Plot History AWS
 if os.path.exists(FILE_HISTORY_AWS):
     dh_a = pd.read_csv(FILE_HISTORY_AWS)
     dh_a['waktu'] = pd.to_datetime(dh_a['waktu'], format='mixed', errors='coerce')
-    dh_a = dh_a.dropna(subset=['waktu', 'nilai']) # Hapus baris cacat/kosong
+    dh_a = dh_a.dropna(subset=['waktu', 'nilai'])
     dh_a = dh_a[(dh_a['waktu'] >= start_naive) & (dh_a['waktu'] <= end_naive) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)]
     fig.add_trace(go.Scatter(
         x=dh_a['waktu'], y=dh_a['nilai'],
@@ -156,11 +180,11 @@ if os.path.exists(FILE_HISTORY_AWS):
         line=dict(color='#0033cc', width=3)
     ))
 
-# 3. Plot History BPBD (Dengan Baju Zirah anti Excel)
+# 3. Plot History BPBD
 if os.path.exists(FILE_HISTORY_BPBD):
     dh_b = pd.read_csv(FILE_HISTORY_BPBD)
     dh_b['waktu'] = pd.to_datetime(dh_b['waktu'], format='mixed', errors='coerce')
-    dh_b = dh_b.dropna(subset=['waktu', 'nilai']) # Hapus baris cacat/kosong
+    dh_b = dh_b.dropna(subset=['waktu', 'nilai'])
     dh_b = dh_b[(dh_b['waktu'] >= start_naive) & (dh_b['waktu'] <= end_naive) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)]
     fig.add_trace(go.Scatter(
         x=dh_b['waktu'], y=dh_b['nilai'],
@@ -171,7 +195,15 @@ if os.path.exists(FILE_HISTORY_BPBD):
 # 4. Garis Batas & Garis Waktu Saat Ini
 fig.add_hline(y=2.50, line_dash="dash", line_color="red", annotation_text="AWAS ROB", annotation_position="top right")
 fig.add_hline(y=2.30, line_dash="dash", line_color="orange", annotation_text="WASPADA", annotation_position="top right")
-fig.add_vline(x=now_naive, line_dash="dash", line_color="green", annotation_text=f"Saat Ini ({sekarang.strftime('%H:%M')})", annotation_position="top left")
+
+# Fix Bug Plotly Timestamp
+fig.add_vline(
+    x=now_naive.timestamp() * 1000, 
+    line_dash="dash", 
+    line_color="green", 
+    annotation_text=f"Saat Ini ({sekarang.strftime('%H:%M')})", 
+    annotation_position="top left"
+)
 
 # Layout Grafik
 fig.update_layout(

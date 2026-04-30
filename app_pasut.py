@@ -245,7 +245,23 @@ if df_pred is not None:
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end)]
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
+    # --- PERBAIKAN: Pisah Garis dan Teks ---
+    # 1. Bikin Garis vertikal waktu saat ini (Tanpa teks)
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
+    
+    # 2. Tambahin Teks Anotasi manual (Biar nggak error datetime)
+    teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
+    fig.add_annotation(
+        x=sekarang,
+        y=1,             # Posisi Y di paling atas grafik (100%)
+        yref="paper",    # Patokan koordinat dihitung dari kanvas
+        text=teks_waktu,
+        showarrow=False,
+        font=dict(color="green", size=12),
+        xanchor="left",  # Teks rata kiri biar nggak numpuk tepat di garis
+        xshift=5         # Geser dikit ke kanan
+    )
+    
     fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
     fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")
     fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=40, b=10), hovermode="x unified")

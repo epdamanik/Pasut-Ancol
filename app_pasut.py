@@ -19,15 +19,30 @@ st.set_page_config(page_title="Monitoring Pasut Tg. Priok", layout="wide", page_
 
 st.markdown("""
     <style>
-    .stApp { background-color: #ffffff; }
-    .header-text { text-align: center; width: 100%; }
-    
-    /* Perbaikan agar tulisan alert jelas & Ubah Background Waspada ke Orange */
-    [data-testid="stAlert"] {
-        border-radius: 10px !important;
+    /* Menghilangkan margin bawaan Streamlit agar konten naik ke atas */
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 0rem !important;
+        max-width: 95% !important;
     }
     
-    /* Maksa background st.warning jadi Orange */
+    .stApp { background-color: #ffffff; }
+    
+    /* Header styling agar mepet ke atas */
+    .header-text { 
+        text-align: center; 
+        width: 100%; 
+        margin-top: -25px; 
+        margin-bottom: 10px;
+    }
+    
+    /* Perbaikan agar tulisan alert jelas */
+    [data-testid="stAlert"] {
+        border-radius: 10px !important;
+        margin-bottom: 10px !important;
+    }
+    
+    /* Background Waspada ke Orange */
     div[data-testid="stNotificationContentWarning"] {
         background-color: #ff9800 !important;
         color: #000000 !important;
@@ -39,23 +54,27 @@ st.markdown("""
         font-weight: 700 !important;
     }
     
+    /* Metrics Styling */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
-    [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
+    [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: 850 !important; color: #0f172a !important; }
     div[data-testid="stMetric"] {
         background-color: #f8fafc !important; 
         border: 1px solid #e2e8f0 !important;
         border-left: 5px solid #1e40af !important; 
-        padding: 15px !important; 
+        padding: 10px 15px !important; 
         border-radius: 10px !important;
-        min-height: 130px !important; 
+        min-height: 100px !important; 
         display: flex; flex-direction: column; justify-content: center;
     }
+    
+    /* Summary Box Styling */
     .summary-box {
-        background-color: #f1f5f9 !important; padding: 12px !important; 
+        background-color: #f1f5f9 !important; padding: 10px !important; 
         border-radius: 10px !important; margin-bottom: 15px !important; 
         border-left: 5px solid #1e3a8a !important; text-align: center !important;
     }
     .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
+    
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -64,17 +83,17 @@ st.markdown("""
 tz_jkt = pytz.timezone('Asia/Jakarta')
 sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
 
-# --- 3. SIDEBAR (Logo dipindah ke sini) ---
+# --- 3. SIDEBAR (Logo & Filter) ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
 
 with st.sidebar:
     if os.path.exists(NAMA_FILE_LOGO):
-        # Menggunakan kolom agar logo tidak selebar sidebar (lebih proporsional)
-        _, col_img, _ = st.columns([0.2, 0.6, 0.2])
+        # Kolom untuk mengecilkan logo agar proporsional
+        _, col_img, _ = st.columns([0.25, 0.5, 0.25])
         with col_img:
             st.image(NAMA_FILE_LOGO, use_container_width=True)
     
-    st.markdown("<h3 style='text-align: center; color: #1e3a8a; margin-top: -10px;'>BMKG MARITIM</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #1e3a8a; margin-top: -10px; font-size: 1.1rem;'>BMKG MARITIM</h3>", unsafe_allow_html=True)
     st.divider()
     
     st.subheader("🗓️ Filter Grafik")
@@ -82,16 +101,19 @@ with st.sidebar:
     
     st.divider()
     st.info("Data Prediksi ditarik dari Excel. Data History disuplai otomatis tiap 15 menit.")
-    st.caption("v2.0 - Stasiun Meteorologi Maritim Tanjung Priok")
+    st.caption("© 2026 Stasiun Meteorologi Maritim Tanjung Priok")
 
-# --- 4. HEADER UTAMA ---
+# --- 4. HEADER UTAMA (Posisi Diperbaiki) ---
 st.markdown(f"""
     <div class="header-text">
-        <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.7rem;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
-        <p style="color: #1e40af; font-weight: 700; margin-top: 5px; font-size: 1.1rem;">Monitoring Tinggi Muka Air (TMA) Real-Time</p>
+        <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.55rem; line-height: 1.2;">
+            STASIUN METEOROLOGI MARITIM TANJUNG PRIOK
+        </h2>
+        <p style="color: #1e40af; font-weight: 700; margin-top: 4px; font-size: 1rem; letter-spacing: 0.5px;">
+            Monitoring Tinggi Muka Air (TMA) Real-Time
+        </p>
     </div>
     """, unsafe_allow_html=True)
-st.divider()
 
 # --- 5. DATA FUNCTIONS ---
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
@@ -148,7 +170,7 @@ if df_pred is not None and not df_pred.empty:
         st.warning(f"**⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})**", icon="📢")
         play_audio("waspada ROB.mp3")
 
-    # Summary Today
+    # Summary Box
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         val_max, jam_max = df_h[col_val].max(), df_h.loc[df_h[col_val].idxmax(), col_tgl].strftime("%H:%M")
@@ -158,68 +180,59 @@ if df_pred is not None and not df_pred.empty:
     # Metrics
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
-    m2.metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m dr prediksi" if live_data['aws'] else None, delta_color="inverse")
-    m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
+    m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", 
+              delta=f"{(live_data['aws'] - h_now):+.2f}m" if live_data['aws'] else None, delta_color="inverse")
+    m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", 
+              delta=f"{(live_data['bpbd'] - h_now):+.2f}m" if live_data['bpbd'] else None, delta_color="inverse")
     
-    # Tren Logic
-    waktu_target = sekarang + timedelta(hours=3)
-    h_next = df_pred.loc[(df_pred[col_tgl] - waktu_target).abs().idxmin(), col_val]
+    # Tren
+    h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val]
     selisih = h_next - h_now
-    threshold = 0.05
-
-    if abs(selisih) < threshold:
-        tren_status = "↔️ STAGNAN"
-    elif selisih > 0:
-        tren_status = "📈 NAIK"
-    else:
-        tren_status = "📉 TURUN"
-    
-    m4.metric("Tren (3 Jam Ke Depan)", tren_status)
+    if abs(selisih) < 0.05: tren_status = "↔️ STAGNAN"
+    elif selisih > 0: tren_status = "📈 NAIK"
+    else: tren_status = "📉 TURUN"
+    m4.metric("Tren (3j Kedepan)", tren_status)
 
     # --- PLOTLY CHART ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
-    # 1. Garis Prediksi
-    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', dash='dot')))
+    # Garis Prediksi
+    fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#94a3b8', dash='dot')))
     
-    # Max-Min Harian Dots
+    # Titik Max/Min Harian
     df_plot['tgl_saja'] = df_plot[col_tgl].dt.date
     for tgl in df_plot['tgl_saja'].unique():
         df_tgl = df_plot[df_plot['tgl_saja'] == tgl]
         p_max = df_tgl.loc[df_tgl[col_val].idxmax()]
-        fig.add_trace(go.Scatter(x=[p_max[col_tgl]], y=[p_max[col_val]], mode='markers+text', text=[f"<b>{p_max[col_val]:.2f}</b>"], textposition="top center", marker=dict(color='red', size=8, symbol='diamond'), showlegend=False))
+        fig.add_trace(go.Scatter(x=[p_max[col_tgl]], y=[p_max[col_val]], mode='markers+text', text=[f"<b>{p_max[col_val]:.2f}</b>"], textposition="top center", marker=dict(color='#ef4444', size=7), showlegend=False))
         p_min = df_tgl.loc[df_tgl[col_val].idxmin()]
-        fig.add_trace(go.Scatter(x=[p_min[col_tgl]], y=[p_min[col_val]], mode='markers+text', text=[f"<b>{p_min[col_val]:.2f}</b>"], textposition="bottom center", marker=dict(color='blue', size=8, symbol='diamond'), showlegend=False))
+        fig.add_trace(go.Scatter(x=[p_min[col_tgl]], y=[p_min[col_val]], mode='markers+text', text=[f"<b>{p_min[col_val]:.2f}</b>"], textposition="bottom center", marker=dict(color='#3b82f6', size=7), showlegend=False))
 
-    # 2. History AWS & BPBD
-    if os.path.exists(FILE_HISTORY_AWS):
-        dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'], format='mixed', errors='coerce')
-        dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
-        fig.add_trace(go.Scatter(x=dh_a['waktu'], y=dh_a['nilai'], name='AWS (History)', mode='lines+markers', line=dict(color='#7c3aed', width=3)))
+    # History Data
+    for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'BPBD (Hist)', '#f59e0b')]:
+        if os.path.exists(file):
+            dh = pd.read_csv(file); dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
+            dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end) & (dh['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
+            fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, mode='lines', line=dict(color=color, width=2.5)))
 
-    if os.path.exists(FILE_HISTORY_BPBD):
-        dh_b = pd.read_csv(FILE_HISTORY_BPBD); dh_b['waktu'] = pd.to_datetime(dh_b['waktu'], format='mixed', errors='coerce')
-        dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
-        fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
-
-    fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
-    fig.add_annotation(x=sekarang, y=1, yref="paper", text=f"<b>Saat Ini ({sekarang.strftime('%H:%M')} WIB)</b>", showarrow=False, font=dict(color="green"), xanchor="left", xshift=5)
+    # Annotations
+    fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="#22c55e")
+    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS")
+    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="WASPADA")
     
-    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
-    fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")
-    fig.update_layout(height=550, template="plotly_white", margin=dict(l=10, r=10, t=40, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+    fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
 
-    # Footer
+    # Footer Buttons
     st.divider()
     f1, f2, f3 = st.columns(3)
     with f1:
-        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Download AWS", open(FILE_HISTORY_AWS, 'rb'), "history_aws.csv", "text/csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Unduh Data AWS", open(FILE_HISTORY_AWS, 'rb'), "aws_priok.csv", "text/csv", use_container_width=True)
     with f2:
-        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Download TMA PSR. IKAN", open(FILE_HISTORY_BPBD, 'rb'), "history_bpbd.csv", "text/csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Unduh Data BPBD", open(FILE_HISTORY_BPBD, 'rb'), "bpbd_pasarikan.csv", "text/csv", use_container_width=True)
     with f3: 
-        if st.button("🔄 Force Refresh", use_container_width=True): st.cache_data.clear(); st.rerun()
+        if st.button("🔄 Segarkan Data", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:
-    st.error("Data prediksi tidak ditemukan atau format kolom Excel salah.")
+    st.error("Data prediksi tidak ditemukan. Pastikan file Excel tersedia.")

@@ -161,8 +161,8 @@ if df_pred is not None and not df_pred.empty:
 
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
-        v_max, v_min = df_h[col_val].max(), df_h[col_val].min()
-        st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {v_max:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {v_min:.2f}m</span></span></div>', unsafe_allow_html=True)
+        v_max_today, v_min_today = df_h[col_val].max(), df_h[col_val].min()
+        st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {v_max_today:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {v_min_today:.2f}m</span></span></div>', unsafe_allow_html=True)
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
@@ -180,14 +180,36 @@ if df_pred is not None and not df_pred.empty:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
-        # Prediksi
+        # 1. Garis Prediksi
         fig.add_trace(go.Scatter(
             x=df_plot[col_tgl], y=df_plot[col_val], 
             name='Prediksi', mode='lines',
             line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline'),
         ))
         
-        # History
+        # --- TAMBAHAN: DOT MAX & MIN PREDIKSI ---
+        idx_max = df_plot[col_val].idxmax()
+        idx_min = df_plot[col_val].idxmin()
+        
+        # Dot Max
+        fig.add_trace(go.Scatter(
+            x=[df_plot.loc[idx_max, col_tgl]], y=[df_plot.loc[idx_max, col_val]],
+            mode='markers+text', name='Max Prediksi',
+            marker=dict(color='#ef4444', size=10, symbol='circle'),
+            text=[f"MAX {df_plot.loc[idx_max, col_val]:.2f}m"],
+            textposition="top center", showlegend=False
+        ))
+        
+        # Dot Min
+        fig.add_trace(go.Scatter(
+            x=[df_plot.loc[idx_min, col_tgl]], y=[df_plot.loc[idx_min, col_val]],
+            mode='markers+text', name='Min Prediksi',
+            marker=dict(color='#3b82f6', size=10, symbol='circle'),
+            text=[f"MIN {df_plot.loc[idx_min, col_val]:.2f}m"],
+            textposition="bottom center", showlegend=False
+        ))
+
+        # 2. History Data
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'BPBD (Hist)', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
@@ -200,7 +222,7 @@ if df_pred is not None and not df_pred.empty:
                         line=dict(color=color, width=3.5, shape='spline'),
                     ))
 
-        # --- GARIS SEKARANG (FIXED VALUE ERROR) ---
+        # 3. Garis Sekarang
         y_max_axis = df_plot[col_val].max() + 0.3
         y_min_axis = df_plot[col_val].min() - 0.2
 
@@ -212,7 +234,7 @@ if df_pred is not None and not df_pred.empty:
             line=dict(color="#22c55e", width=2, dash="dash"),
             text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"],
             textposition="top center",
-            textfont=dict(color="#166534", size=12), # Properti small-caps dihapus biar gak error
+            textfont=dict(color="#166534", size=12),
             showlegend=False
         ))
         

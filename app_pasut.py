@@ -37,12 +37,12 @@ st.markdown("""
         transform-origin: top left !important;
         background-color: #ffffff !important;
         border-radius: 8px !important;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+        box-shadow: 0 10px 10px rgba(0,0,0,0.1) !important;
     }
 
     /* 3. Rampingkan kotak input di sidebar */
     div[data-testid="stDateInput"] {
-        max-width: 90% !important;
+        max-width: 100% !important;
         margin: 0 auto !important;
     }
 

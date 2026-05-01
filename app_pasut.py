@@ -222,7 +222,7 @@ if df_pred is not None and not df_pred.empty:
     with f1:
         if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Download AWS", open(FILE_HISTORY_AWS, 'rb'), "history_aws.csv", "text/csv", use_container_width=True)
     with f2:
-        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Download BPBD", open(FILE_HISTORY_BPBD, 'rb'), "history_bpbd.csv", "text/csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Download TMA PSR. IKAN", open(FILE_HISTORY_BPBD, 'rb'), "history_bpbd.csv", "text/csv", use_container_width=True)
     with f3: 
         if st.button("🔄 Force Refresh", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:

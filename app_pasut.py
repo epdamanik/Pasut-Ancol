@@ -22,42 +22,37 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; }
     
-    /* --- CSS INI HANYA MENYENTUH WARNING & ERROR DI MAIN AREA --- */
-
-    /* 1. Target khusus Warning (Orange) - Berdasarkan Icon Label */
-    [data-testid="stMain"] div[data-testid="stNotificationContentWarning"] {
-        background-color: #FF8C00 !important;
-        border: none !important;
+    /* --- JURUS TERAKHIR: TARGETING BERDASARKAN DATA-TESTID --- */
+    /* Ini akan merubah Warning di tengah jadi Orange */
+    [data-testid="stMain"] [data-testid="stNotificationContentWarning"] {
+        background-color: #FF8C00 !important; 
         border-radius: 10px !important;
+        border: none !important;
+    }
+    /* Ini akan merubah Error di tengah jadi Merah */
+    [data-testid="stMain"] [data-testid="stNotificationContentError"] {
+        background-color: #FF4B4B !important; 
+        border-radius: 10px !important;
+        border: none !important;
     }
     
-    /* 2. Target khusus Error (Merah) - Berdasarkan Icon Label */
-    [data-testid="stMain"] div[data-testid="stNotificationContentError"] {
-        background-color: #FF4B4B !important;
-        border: none !important;
-        border-radius: 10px !important;
-    }
-
-    /* 3. Paksa Warna Teks & Icon jadi Hitam agar Kontras */
-    [data-testid="stMain"] div[data-testid="stNotificationContentWarning"] p,
-    [data-testid="stMain"] div[data-testid="stNotificationContentError"] p {
+    /* Warna Teks Hitam & Bold */
+    [data-testid="stMain"] [data-testid="stNotificationContentWarning"] p,
+    [data-testid="stMain"] [data-testid="stNotificationContentError"] p {
         color: #000000 !important;
         font-weight: 850 !important;
     }
-    [data-testid="stMain"] div[data-testid="stNotificationContentWarning"] svg,
-    [data-testid="stMain"] div[data-testid="stNotificationContentError"] svg {
+    [data-testid="stMain"] [data-testid="stNotificationContentWarning"] svg,
+    [data-testid="stMain"] [data-testid="stNotificationContentError"] svg {
         fill: #000000 !important;
     }
 
-    /* 4. KUNCI SIDEBAR (st.info) AGAR TETAP BIRU ASLI */
-    /* Kita paksa sidebar info mengabaikan style di atas */
-    [data-testid="stSidebar"] div[data-testid="stNotificationContentInfo"] {
+    /* Kunci Sidebar tetap Biru (st.info) */
+    [data-testid="stSidebar"] [data-testid="stNotificationContentInfo"] {
         background-color: rgba(0, 104, 201, 0.1) !important;
-        color: rgb(0, 68, 131) !important;
-        border: none !important;
     }
 
-    /* Styling Metric & Box */
+    /* Styling Metric & Box sesuai aslinya */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     div[data-testid="stMetric"] {
@@ -93,7 +88,6 @@ with st.sidebar:
     if st.button("🔊 Aktifkan Notifikasi Suara"):
         st.success("Audio Siap!")
     
-    # CSS di atas memastikan ini TETAP BIRU
     st.info("Data Prediksi ditarik dari Excel. Data History disuplai otomatis tiap 15 menit.")
 
 # --- 4. HEADER ---
@@ -122,11 +116,7 @@ def play_audio(file_path):
         with open(file_path, "rb") as f:
             data = f.read()
             b64 = base64.b64encode(data).decode()
-            audio_html = f'''
-                <audio autoplay="true">
-                    <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-                </audio>
-            '''
+            audio_html = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
             st.components.v1.html(audio_html, height=0)
 
 def get_latest_from_csv(file_path):
@@ -158,6 +148,7 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
     
+    # LOGIKA ALERT (ROB)
     check_values = {"Prediksi": h_now, "AWS": live_data['aws'], "BPBD": live_data['bpbd']}
     awas = [n for n, v in check_values.items() if v is not None and v >= 2.5]
     waspada = [n for n, v in check_values.items() if v is not None and 2.3 <= v < 2.5]
@@ -169,7 +160,7 @@ if df_pred is not None and not df_pred.empty:
         st.warning(f"⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
         play_audio("waspada ROB.mp3")
 
-    # Summary Today
+    # Summary Today (Fitur Balik!)
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         val_max, jam_max = df_h[col_val].max(), df_h.loc[df_h[col_val].idxmax(), col_tgl].strftime("%H:%M")
@@ -179,31 +170,27 @@ if df_pred is not None and not df_pred.empty:
     # Metrics
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Prediksi Pasut (TMA psr. ikan 2025)", f"{h_now:.2f} m")
-    m2.metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m dr prediksi" if live_data['aws'] else None, delta_color="inverse")
-    m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
+    m2.metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m" if live_data['aws'] else None, delta_color="inverse")
+    m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m" if live_data['bpbd'] else None, delta_color="inverse")
     
-    # Tren Logika
-    waktu_target = sekarang + timedelta(hours=3)
-    h_next = df_pred.loc[(df_pred[col_tgl] - waktu_target).abs().idxmin(), col_val]
+    # Tren Logika (Fitur Balik!)
+    w_target = sekarang + timedelta(hours=3)
+    h_next = df_pred.loc[(df_pred[col_tgl] - w_target).abs().idxmin(), col_val]
     selisih = h_next - h_now
-    threshold = 0.05 
+    tren_status = "↔️ STAGNAN"
+    if selisih > 0.05: tren_status = "📈 LEVEL AIR NAIK"
+    elif selisih < -0.05: tren_status = "📉 LEVEL AIR TURUN"
+    m4.metric("Tren (3 Jam Ke Depan)", tren_status)
 
-    if abs(selisih) < threshold:
-        tren_status = "↔️ STAGNAN"
-    elif selisih > 0:
-        tren_status = "📈 LEVEL AIR NAIK"
-    else:
-        tren_status = "📉 LEVEL AIR TURUN"
-    
-    m4.metric("Tren", tren_status)
-
-    # --- PLOTLY CHART ---
+    # --- PLOTLY CHART (UTUH) ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
+    # Trace Prediksi
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', dash='dot')))
     
+    # Titik Max/Min harian
     df_plot['tgl_saja'] = df_plot[col_tgl].dt.date
     for tgl in df_plot['tgl_saja'].unique():
         df_tgl = df_plot[df_plot['tgl_saja'] == tgl]
@@ -212,6 +199,7 @@ if df_pred is not None and not df_pred.empty:
         p_min = df_tgl.loc[df_tgl[col_val].idxmin()]
         fig.add_trace(go.Scatter(x=[p_min[col_tgl]], y=[p_min[col_val]], mode='markers+text', text=[f"<b>{p_min[col_val]:.2f}</b>"], textposition="bottom center", marker=dict(color='blue', size=8, symbol='diamond'), showlegend=False))
 
+    # History Data
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'], format='mixed', errors='coerce')
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
@@ -223,9 +211,7 @@ if df_pred is not None and not df_pred.empty:
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
-    
-    teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
-    fig.add_annotation(x=sekarang, y=1, yref="paper", text=teks_waktu, showarrow=False, font=dict(color="green", size=12), xanchor="left", xshift=5)
+    fig.add_annotation(x=sekarang, y=1, yref="paper", text=f"<b>Saat Ini ({sekarang.strftime('%H:%M')} WIB)</b>", showarrow=False, font=dict(color="green"))
     
     fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
     fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")
@@ -242,4 +228,4 @@ if df_pred is not None and not df_pred.empty:
     with f3: 
         if st.button("🔄 Force Refresh", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:
-    st.error("Data prediksi tidak ditemukan atau format kolom Excel salah.")
+    st.error("Data prediksi tidak ditemukan.")

@@ -100,7 +100,7 @@ with st.sidebar:
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     
     st.divider()
-    st.info("Prediksi pasut dihitung menggunakan metode Analisis Harmonik dengan referensi data historis TMA Pasar Ikan tahun 2025.")
+    st.info("Data prediksi pasang surut ini dihitung menggunakan metode Analisis Harmonik berdasarkan data historis Tinggi Muka Air (TMA) dari Dinas Sumber Daya Air (DSDA) Provinsi DKI Jakarta tahun 2025.")
     st.caption("© 2026 Stasiun Meteorologi Maritim Tanjung Priok")
 
 # --- 4. HEADER UTAMA (Posisi Diperbaiki) ---

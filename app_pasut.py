@@ -83,12 +83,12 @@ with st.sidebar:
     
     with st.expander("ℹ️ Info Sumber Data"):
         st.markdown("""
-        <div style="text-align: justify; font-size: 0.85rem; color: #475569;">
+        <div style="text-align: justify; font-size: 0.95rem; color: #475569;">
             <strong>📍 Prediksi:</strong><br>
             Analisis Harmonik data TMA Pasar Ikan I (DSDA) Tahun 2025.
         </div>
         <br>
-        <div style="text-align: justify; font-size: 0.85rem; color: #475569;">
+        <div style="text-align: justify; font-size: 0.95rem; color: #475569;">
             <strong>⚡ Real-time:</strong>
             <ul style="margin-top: 5px; padding-left: 20px;">
                 <li>AWS Stamar Tanjung Priok (BMKG).</li>

@@ -85,7 +85,7 @@ with st.sidebar:
     with st.expander("ℹ️ Info Sumber Data"):
         st.markdown("""
         **📍 Prediksi:**
-        Analisis Harmonik data TMA Pasar Ikan I (DSDA) 2025.
+        Analisis Harmonik data TMA Pasar Ikan I (DSDA) Tahun 2025.
         
         **⚡ Real-time:**
         * AWS Stamar Tanjung Priok (BMKG).

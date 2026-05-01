@@ -25,7 +25,7 @@ st.markdown("""
     /* --- FIX POSISI & UKURAN KALENDER --- */
     /* 1. Paksa kalender terbuka ke bawah */
     div[data-testid="stDateInput"] div[role="presentation"] {
-        top: 100% !important;
+        top: 75% !important;
         bottom: auto !important;
     }
     

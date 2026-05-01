@@ -13,73 +13,36 @@ seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
 if seconds_to_next <= 0: seconds_to_next = 900
 st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 
-# --- 1. KONFIGURASI HALAMAN & CSS ---
-st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="🌊")
-
-st.markdown("""
-    <style>
-    .block-container { padding-top: 2.2rem !important; padding-bottom: 0rem !important; max-width: 95% !important; }
-    .stApp { background-color: #ffffff; }
-    .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
-
-    /* --- FIX POSISI & UKURAN KALENDER --- */
-    /* 1. Paksa kalender terbuka ke bawah */
+/* --- FIX POSISI & UKURAN KALENDER --- */
+    
+    /* 1. Atur posisi pop-up agar pas di bawah kotak input (Gak melayang) */
     div[data-testid="stDateInput"] div[role="presentation"] {
-        top: 50% !important;
-        bottom: auto !important;
+        top: 100% !important; /* Pas di bawah box */
+        left: 0 !important;
+        display: flex !important;
+        justify-content: center !important;
     }
     
-    /* 2. Mengecilkan lebar kotak input di sidebar */
+    /* 2. Hajar langsung ke kontainer utama kalender */
+    div[data-baseweb="calendar"] {
+        transform: scale(0.8) !important; /* Jangan 0.5 Bre, kekecilan ntar gak bisa diklik, 0.8 udah pas imut */
+        transform-origin: top left !important;
+        background-color: #ffffff !important;
+        border-radius: 8px !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+    }
+
+    /* 3. Mengecilkan kotak input (tempat klik) agar sidebar lega */
     div[data-testid="stDateInput"] {
-        max-width: 70% !important; 
+        max-width: 85% !important;
         margin: 0 auto !important;
     }
 
-    /* 3. Mengecilkan ukuran panel kalender saat diklik (Skala 50%) */
-    div[role="presentation"] div[data-baseweb="calendar"] {
-        transform: scale(0.5) !important;
-        transform-origin: top center !important;
+    /* 4. Menyesuaikan lebar internal agar tidak meluber */
+    div[data-baseweb="popover"], div[data-baseweb="calendar"] {
+        width: auto !important;
+        max-width: 250px !important; /* Batasin lebar maksimalnya */
     }
-
-    /* --- GAYA METRIK & FOOTER --- */
-    div[data-testid="stMetric"] {
-        background-color: #ffffff !important; 
-        border: 1px solid #e2e8f0 !important;
-        border-left: 5px solid #1e40af !important; 
-        padding: 15px !important; 
-        border-radius: 12px !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-        min-height: 125px !important; 
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
-        transition: all 0.3s ease-in-out !important;
-    }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-5px) !important;
-        box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1) !important;
-        border-color: #1e40af !important;
-    }
-
-    [data-testid="stMetricLabel"] { color: #1e3a8a !important; font-weight: 700 !important; font-size: 0.85rem !important; }
-    [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 800 !important; color: #0f172a !important; }
-
-    .summary-box {
-        background-color: #f1f5f9 !important; padding: 10px !important; 
-        border-radius: 10px !important; margin-bottom: 15px !important; 
-        border-left: 5px solid #1e3a8a !important; text-align: center !important;
-    }
-    .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
-
-    .footer-card {
-        margin-top: 50px; padding: 12px; border-radius: 10px; 
-        background-color: #f8fafc; border: 1px solid #e2e8f0; 
-        text-align: center;
-    }
-    .dev-name { color: #475569; font-weight: 400; font-size: 0.55rem; margin-top: 2px; display: block; }
-    footer {visibility: hidden;}
-    </style>
-    """, unsafe_allow_html=True)
 
 # --- 2. LOGIC WAKTU ---
 tz_jkt = pytz.timezone('Asia/Jakarta')

@@ -140,7 +140,7 @@ with st.sidebar:
             unsafe_allow_html=True
         )
     
-    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -5px; font-size: 0.85rem; font-weight: bold;'>STAMAR TANJUNG PRIOK</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -5px; font-size: 0.85rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
     tgl_range = st.date_input("🗓️ Rentang Waktu Grafik", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
@@ -166,7 +166,7 @@ with st.sidebar:
     st.markdown(f"""
         <div class="footer-card">
             <p style='font-size: 0.72rem; color: #1e3a8a; margin-bottom: 0; font-weight: 600;'>
-                © 2026 Stamar Tanjung Priok
+                © 2026 Stasiun Meteorologi Maritim Tanjung Priok
             </p>
         </div>
         <div style="text-align: center; margin-top: 15px;">

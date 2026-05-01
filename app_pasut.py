@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-import pytz  
+import pytz
 from streamlit_autorefresh import st_autorefresh
 import os
 import time
@@ -21,6 +21,13 @@ st.markdown("""
     <style>
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; }
+    
+    /* Perbaikan agar tulisan alert (Waspada/Awas) jelas di HP */
+    [data-testid="stAlert"] * {
+        color: #0f172a !important; 
+        font-size: 1.1rem !important;
+    }
+    
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     div[data-testid="stMetric"] {

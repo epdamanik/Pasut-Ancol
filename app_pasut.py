@@ -64,24 +64,31 @@ st.markdown("""
 tz_jkt = pytz.timezone('Asia/Jakarta')
 sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
 
-# --- 3. SIDEBAR ---
+# --- 3. SIDEBAR (Logo dipindah ke sini) ---
+NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
+
 with st.sidebar:
+    if os.path.exists(NAMA_FILE_LOGO):
+        # Menggunakan kolom agar logo tidak selebar sidebar (lebih proporsional)
+        _, col_img, _ = st.columns([0.2, 0.6, 0.2])
+        with col_img:
+            st.image(NAMA_FILE_LOGO, use_container_width=True)
+    
+    st.markdown("<h3 style='text-align: center; color: #1e3a8a; margin-top: -10px;'>BMKG MARITIM</h3>", unsafe_allow_html=True)
+    st.divider()
+    
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
+    
     st.divider()
     st.info("Data Prediksi ditarik dari Excel. Data History disuplai otomatis tiap 15 menit.")
+    st.caption("v2.0 - Stasiun Meteorologi Maritim Tanjung Priok")
 
-# --- 4. HEADER ---
-NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
-c1, c2, c3 = st.columns([1, 0.4, 1])
-with c2:
-    if os.path.exists(NAMA_FILE_LOGO):
-        st.image(NAMA_FILE_LOGO, use_container_width=True)
-
+# --- 4. HEADER UTAMA ---
 st.markdown(f"""
     <div class="header-text">
-        <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.5rem;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
-        <p style="color: #1e40af; font-weight: 700; margin-top: 5px;">Monitoring Tinggi Muka Air (TMA) Real-Time</p>
+        <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.7rem;">STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h2>
+        <p style="color: #1e40af; font-weight: 700; margin-top: 5px; font-size: 1.1rem;">Monitoring Tinggi Muka Air (TMA) Real-Time</p>
     </div>
     """, unsafe_allow_html=True)
 st.divider()
@@ -150,24 +157,24 @@ if df_pred is not None and not df_pred.empty:
 
     # Metrics
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Prediksi Pasut (TMA psr. ikan 2025)", f"{h_now:.2f} m")
+    m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     m2.metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m dr prediksi" if live_data['aws'] else None, delta_color="inverse")
     m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
     
-    # --- LOGIKA TREN (2 Jam ke Depan + Stagnan) ---
+    # Tren Logic
     waktu_target = sekarang + timedelta(hours=3)
     h_next = df_pred.loc[(df_pred[col_tgl] - waktu_target).abs().idxmin(), col_val]
     selisih = h_next - h_now
-    threshold = 0.05 # Threshold 5 cm
+    threshold = 0.05
 
     if abs(selisih) < threshold:
         tren_status = "↔️ STAGNAN"
     elif selisih > 0:
-        tren_status = "📈 LEVEL AIR NAIK"
+        tren_status = "📈 NAIK"
     else:
-        tren_status = "📉 LEVEL AIR TURUN"
+        tren_status = "📉 TURUN"
     
-    m4.metric("Tren", tren_status)
+    m4.metric("Tren (3 Jam Ke Depan)", tren_status)
 
     # --- PLOTLY CHART ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
@@ -177,30 +184,14 @@ if df_pred is not None and not df_pred.empty:
     # 1. Garis Prediksi
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', dash='dot')))
     
-    # --- TAMBAHAN: LOGIKA DOT MAX-MIN HARIAN ---
+    # Max-Min Harian Dots
     df_plot['tgl_saja'] = df_plot[col_tgl].dt.date
     for tgl in df_plot['tgl_saja'].unique():
         df_tgl = df_plot[df_plot['tgl_saja'] == tgl]
-        # Cari Max Harian
         p_max = df_tgl.loc[df_tgl[col_val].idxmax()]
-        fig.add_trace(go.Scatter(
-            x=[p_max[col_tgl]], y=[p_max[col_val]],
-            mode='markers+text',
-            text=[f"<b>{p_max[col_val]:.2f}</b>"],
-            textposition="top center",
-            marker=dict(color='red', size=8, symbol='diamond'),
-            name=f"Max {tgl}", showlegend=False
-        ))
-        # Cari Min Harian
+        fig.add_trace(go.Scatter(x=[p_max[col_tgl]], y=[p_max[col_val]], mode='markers+text', text=[f"<b>{p_max[col_val]:.2f}</b>"], textposition="top center", marker=dict(color='red', size=8, symbol='diamond'), showlegend=False))
         p_min = df_tgl.loc[df_tgl[col_val].idxmin()]
-        fig.add_trace(go.Scatter(
-            x=[p_min[col_tgl]], y=[p_min[col_val]],
-            mode='markers+text',
-            text=[f"<b>{p_min[col_val]:.2f}</b>"],
-            textposition="bottom center",
-            marker=dict(color='blue', size=8, symbol='diamond'),
-            name=f"Min {tgl}", showlegend=False
-        ))
+        fig.add_trace(go.Scatter(x=[p_min[col_tgl]], y=[p_min[col_val]], mode='markers+text', text=[f"<b>{p_min[col_val]:.2f}</b>"], textposition="bottom center", marker=dict(color='blue', size=8, symbol='diamond'), showlegend=False))
 
     # 2. History AWS & BPBD
     if os.path.exists(FILE_HISTORY_AWS):
@@ -213,25 +204,12 @@ if df_pred is not None and not df_pred.empty:
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
-    # Garis vertikal waktu saat ini
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
-    
-    # Tambahin Teks Anotasi manual
-    teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
-    fig.add_annotation(
-        x=sekarang,
-        y=1,             
-        yref="paper",    
-        text=teks_waktu,
-        showarrow=False,
-        font=dict(color="green", size=12),
-        xanchor="left",  
-        xshift=5         
-    )
+    fig.add_annotation(x=sekarang, y=1, yref="paper", text=f"<b>Saat Ini ({sekarang.strftime('%H:%M')} WIB)</b>", showarrow=False, font=dict(color="green"), xanchor="left", xshift=5)
     
     fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
     fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")
-    fig.update_layout(height=550, template="plotly_white", margin=dict(l=10, r=10, t=40, b=10), hovermode="x unified")
+    fig.update_layout(height=550, template="plotly_white", margin=dict(l=10, r=10, t=40, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
 
     # Footer

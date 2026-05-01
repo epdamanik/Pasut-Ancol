@@ -14,10 +14,17 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 FILE_HISTORY_AWS = 'history_aws_priok.csv'
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
-LIMIT_SENSOR_ERROR = 3.5
+
+# --- KONFIGURASI FILTER ---
+LIMIT_SENSOR_ERROR = 3.5  # Batas Atas (Maksimal)
+MIN_VALID_VALUE = 1.2     # Batas Bawah (Minimal) - Data di bawah ini dianggap sampah
 
 def save_to_csv(filename, waktu, nilai):
-    if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
+    # FILTER BARU: Cek batas bawah dan batas atas
+    if nilai is None or nilai > LIMIT_SENSOR_ERROR or nilai < MIN_VALID_VALUE:
+        print(f"DEBUG: Nilai {nilai} m diblokir (di luar range {MIN_VALID_VALUE} - {LIMIT_SENSOR_ERROR})")
+        return
+    
     menit_bulat = (waktu.minute // 15) * 15
     waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
     waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
@@ -28,6 +35,8 @@ def save_to_csv(filename, waktu, nilai):
     else:
         try:
             old_data = pd.read_csv(filename)
+            # Pastikan kolom waktu terbaca sebagai string untuk perbandingan
+            old_data['waktu'] = old_data['waktu'].astype(str)
             old_data = old_data[old_data['waktu'] != waktu_str]
             combined = pd.concat([old_data, new_data]).sort_values('waktu')
             combined.to_csv(filename, index=False)
@@ -62,40 +71,33 @@ def run_scraper():
         try:
             print("\n--- Scraping BPBD (Metode Deep Scan 3.0) ---")
             driver.get("https://poskobanjir.dsdadki.web.id/")
-            time.sleep(15) # Kasih waktu extra lama buat JS render
+            time.sleep(15) 
 
-            # Skenario 1: Cari Baris Pasar Ikan secara kasar di seluruh teks
             print("Mencari baris Pasar Ikan...")
             all_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'Pasar Ikan')]/ancestor::tr")
             
             for row in all_elements:
                 row_text = row.get_attribute("innerText")
-                print(f"DEBUG: Teks Baris ditemukan -> {row_text}")
-                
-                # Cari angka 3 digit di dalam baris itu
                 nums = re.findall(r"(\d{3})", row_text)
                 for n in nums:
                     val_n = int(n)
-                    if 100 <= val_n <= 350: # Range normal Pasar Ikan (cm)
+                    # Filter angka CM (biasanya 120cm - 350cm)
+                    if 120 <= val_n <= 350: 
                         res["bpbd"] = val_n / 100.0
                         print(f"✅ BPBD Berhasil (Row Text): {res['bpbd']} m")
                         break
                 if res["bpbd"]: break
 
-            # Skenario 2: Kalau masih gagal, ambil SEMUA angka di page yang masuk range
             if not res["bpbd"]:
-                print("Skenario 1 gagal, mencari angka 100-350 di seluruh page...")
+                print("Skenario 1 gagal, mencari snippet...")
                 all_text = driver.find_element(By.TAG_NAME, "body").get_attribute("innerText")
-                # Cari angka di deket kata 'Pasar Ikan'
                 pos = all_text.find("Pasar Ikan")
                 if pos != -1:
-                    # Ambil 200 karakter setelah kata Pasar Ikan
                     snippet = all_text[pos:pos+200]
-                    print(f"DEBUG: Snippet sekitar Pasar Ikan -> {snippet}")
                     nums = re.findall(r"(\d{3})", snippet)
                     for n in nums:
                         val_n = int(n)
-                        if 100 <= val_n <= 350:
+                        if 120 <= val_n <= 350:
                             res["bpbd"] = val_n / 100.0
                             print(f"✅ BPBD Berhasil (Snippet): {res['bpbd']} m")
                             break
@@ -115,7 +117,8 @@ if __name__ == "__main__":
     
     if live_data["aws"] is not None:
         save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-        print(f"SUCCESS AWS: {live_data['aws']} m")
+        
     if live_data["bpbd"] is not None:
-        save_to_csv(FILE_HISTORY_BPBD, sekarang - timedelta(minutes=15), live_data["bpbd"])
-        print(f"SUCCESS BPBD: {live_data['bpbd']} m")
+        # Gunakan jam bulat (:00) agar sinkron dengan data BPBD
+        waktu_bpbd = sekarang.replace(minute=0, second=0, microsecond=0)
+        save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd, live_data["bpbd"])

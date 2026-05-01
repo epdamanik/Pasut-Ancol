@@ -18,11 +18,23 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    .block-container { padding-top: 2.2rem !important; padding-bottom: 0rem !important; max-width: 95% !important; }
+    /* Container Utama - Ruang aman agar tidak kepotong */
+    .block-container { 
+        padding-top: 2.2rem !important; 
+        padding-bottom: 0rem !important; 
+        max-width: 95% !important; 
+    }
     .stApp { background-color: #ffffff; }
-    .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
+    
+    /* Header Utama - Posisi Aman */
+    .header-text { 
+        text-align: center; 
+        width: 100%; 
+        margin-top: -25px; 
+        margin-bottom: 15px; 
+    }
 
-    /* Kotak Metrik Simetris & Animasi */
+    /* Kotak Metrik - SIMETRIS & ANIMASI HOVER */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
@@ -36,15 +48,18 @@ st.markdown("""
         justify-content: center !important;
         transition: all 0.3s ease-in-out !important;
     }
+    
     div[data-testid="stMetric"]:hover {
         transform: translateY(-5px) !important;
         box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1) !important;
         border-color: #1e40af !important;
     }
 
+    /* Font Metrics */
     [data-testid="stMetricLabel"] { color: #1e3a8a !important; font-weight: 700 !important; font-size: 0.85rem !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 800 !important; color: #0f172a !important; }
 
+    /* Summary Bar */
     .summary-box {
         background-color: #f1f5f9 !important; padding: 10px !important; 
         border-radius: 10px !important; margin-bottom: 15px !important; 
@@ -52,12 +67,14 @@ st.markdown("""
     }
     .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
 
+    /* Footer Sidebar - Minimalis */
     .footer-card {
         margin-top: 50px; padding: 12px; border-radius: 10px; 
         background-color: #f8fafc; border: 1px solid #e2e8f0; 
         text-align: center;
     }
-    .dev-name { color: #475569; font-weight: 400; font-size: 0.72rem; margin-top: 2px; display: block; }
+    .dev-name { color: #475569; font-weight: 400; font-size: 0.72rem; margin-top: 4px; display: block; }
+    
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -71,6 +88,7 @@ NAMA_FILE_LOGO = "logo-bmkg-transparan.png"
 
 with st.sidebar:
     if os.path.exists(NAMA_FILE_LOGO):
+        # Logo lebih kecil (kolom tengah dipersempit)
         _, col_img, _ = st.columns([0.38, 0.24, 0.38])
         with col_img:
             st.image(NAMA_FILE_LOGO, use_container_width=True)
@@ -83,11 +101,16 @@ with st.sidebar:
     
     st.divider()
     with st.expander("ℹ️ Info Sumber Data"):
-        st.caption("""
-        **Prediksi:** Analisis Harmonik data TMA Pasar Ikan I (DSDA) 2025.
-        **Real-time:** AWS BMKG & Pintu Air Pasar Ikan I (DSDA).
+        st.markdown("""
+        **📍 Prediksi:**
+        Analisis Harmonik data TMA Pasar Ikan I (DSDA) 2025.
+        
+        **⚡ Real-time:**
+        * AWS Stamar Tanjung Priok (BMKG).
+        * Pintu Air Pasar Ikan I (DSDA).
         """)
     
+    # Footer - Developed by E.P. Damanik
     st.markdown(f"""
         <div class="footer-card">
             <p style='font-size: 0.7rem; color: #1e3a8a; margin-bottom: 0;'>© 2026 Stamar Tanjung Priok</p>
@@ -133,8 +156,7 @@ def load_prediction():
     df = pd.read_excel(FILE_PREDIKSI, engine='openpyxl')
     t_col = next((c for c in ['tanggal_prediksi', 'Waktu_WIB', 'Waktu'] if c in df.columns), None)
     v_col = next((c for c in ['wl_prediksi', 'Tinggi_Navigasi_m'] if c in df.columns), None)
-    if t_col: 
-        df[t_col] = pd.to_datetime(df[t_col], format='mixed', errors='coerce')
+    if t_col: df[t_col] = pd.to_datetime(df[t_col], format='mixed', errors='coerce')
     return df.dropna(subset=[t_col, v_col]).sort_values(t_col), t_col, v_col
 
 # --- 6. EXECUTION ---
@@ -193,7 +215,7 @@ if df_pred is not None and not df_pred.empty:
                 if not dh.empty:
                     fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, line=dict(color=color, width=3)))
 
-        # Threshold & Sekarang
+        # Threshold
         fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="#22c55e")
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS")
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="WASPADA")
@@ -201,14 +223,14 @@ if df_pred is not None and not df_pred.empty:
         fig.update_layout(height=450, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("Tidak ada data dalam rentang waktu terpilih.")
+        st.warning("Pilih rentang waktu pada filter di sidebar untuk menampilkan grafik.")
 
-    # Footer Buttons
+    # Footer Action Buttons
     st.divider()
     c1, c2, c3 = st.columns(3)
-    with c1: st.download_button("📥 AWS CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "aws.csv", use_container_width=True)
-    with c2: st.download_button("📥 BPBD CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "bpbd.csv", use_container_width=True)
+    with c1: st.download_button("📥 Scrape AWS CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "aws.csv", use_container_width=True)
+    with c2: st.download_button("📥 Scrape TMA Pasar Ikan CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "pasarikan.csv", use_container_width=True)
     with c3: 
-        if st.button("🔄 Refresh System", use_container_width=True): st.cache_data.clear(); st.rerun()
+        if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:
     st.error("Gagal memuat data prediksi. Periksa file Excel di GitHub.")

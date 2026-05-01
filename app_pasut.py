@@ -245,7 +245,7 @@ if df_pred is not None and not df_pred.empty:
     h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
     selisih = h_next - h_now
     icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")
-    m4.metric("Tren (3j Kedepan)", f"{icon} {status}")
+    m4.metric("Tren (3 jam Kedepan)", f"{icon} {status}")
 
     # --- PLOTLY CHART ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())

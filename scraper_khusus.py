@@ -17,14 +17,15 @@ FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
 
 # --- KONFIGURASI FILTER ---
 LIMIT_SENSOR_ERROR = 3.5  # Batas Atas (Maksimal)
-MIN_VALID_VALUE = 1.2     # Batas Bawah (Minimal) - Data di bawah ini dianggap sampah
+MIN_VALID_VALUE = 1.2      # Batas Bawah (Minimal) - Data di bawah ini dianggap sampah
 
 def save_to_csv(filename, waktu, nilai):
-    # FILTER BARU: Cek batas bawah dan batas atas
+    # FILTER: Cek batas bawah dan batas atas
     if nilai is None or nilai > LIMIT_SENSOR_ERROR or nilai < MIN_VALID_VALUE:
         print(f"DEBUG: Nilai {nilai} m diblokir (di luar range {MIN_VALID_VALUE} - {LIMIT_SENSOR_ERROR})")
         return
     
+    # Logika pembulatan 15 menit
     menit_bulat = (waktu.minute // 15) * 15
     waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
     waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
@@ -37,6 +38,7 @@ def save_to_csv(filename, waktu, nilai):
             old_data = pd.read_csv(filename)
             # Pastikan kolom waktu terbaca sebagai string untuk perbandingan
             old_data['waktu'] = old_data['waktu'].astype(str)
+            # Hapus data lama jika waktunya sama agar tidak duplikat (Update data terbaru)
             old_data = old_data[old_data['waktu'] != waktu_str]
             combined = pd.concat([old_data, new_data]).sort_values('waktu')
             combined.to_csv(filename, index=False)
@@ -113,12 +115,15 @@ if __name__ == "__main__":
     tz_jkt = pytz.timezone('Asia/Jakarta')
     sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
     print(f"\nEksekusi: {sekarang.strftime('%Y-%m-%d %H:%M:%S')} WIB")
+    
     live_data = run_scraper()
     
+    # Menyimpan data AWS (Mengikuti pembulatan 15 menit di fungsi save_to_csv)
     if live_data["aws"] is not None:
         save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
         
+    # Menyimpan data BPBD Pasar Ikan
     if live_data["bpbd"] is not None:
-        # Gunakan jam bulat (:00) agar sinkron dengan data BPBD
-        waktu_bpbd = sekarang.replace(minute=0, second=0, microsecond=0)
-        save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd, live_data["bpbd"])
+        # PERBAIKAN: Mengirim variabel 'sekarang' langsung tanpa .replace(minute=0)
+        # Hal ini agar save_to_csv bisa mencatat menit :15, :30, dan :45 sebagai baris baru.
+        save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])

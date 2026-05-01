@@ -22,33 +22,43 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; }
     
-    /* --- KHUSUS WASPADA (st.warning) --- */
+    /* --- TARGETING KHUSUS WASPADA (ORANGE) --- */
+    /* Kita pakai aria-label atau data-testid yang lebih dalam agar tidak menyenggol st.info */
     div[data-testid="stNotificationContentWarning"] {
-        background-color: #FF8C00 !important; /* Orange */
+        background-color: #FF8C00 !important; 
         border-radius: 10px !important;
+        border: none !important;
     }
-    div[data-testid="stNotificationContentWarning"] div {
+    div[data-testid="stNotificationContentWarning"] p {
         color: #000000 !important;
-        font-weight: 800 !important;
+        font-weight: 850 !important;
     }
     div[data-testid="stNotificationContentWarning"] svg {
         fill: #000000 !important;
     }
 
-    /* --- KHUSUS AWAS (st.error) --- */
+    /* --- TARGETING KHUSUS AWAS (RED) --- */
     div[data-testid="stNotificationContentError"] {
-        background-color: #FF4B4B !important; /* Merah Terang */
+        background-color: #FF4B4B !important; 
         border-radius: 10px !important;
+        border: none !important;
     }
-    div[data-testid="stNotificationContentError"] div {
+    div[data-testid="stNotificationContentError"] p {
         color: #000000 !important;
-        font-weight: 800 !important;
+        font-weight: 850 !important;
     }
     div[data-testid="stNotificationContentError"] svg {
         fill: #000000 !important;
     }
 
-    /* CSS Metric & Summary Tetap Sama */
+    /* --- SIDEBAR INFO BIAR TETAP BIRU --- */
+    /* Kita kunci agar info tetap pada warna aslinya */
+    div[data-testid="stNotificationContentInfo"] {
+        background-color: rgba(0, 104, 201, 0.1) !important;
+        color: rgb(0, 68, 131) !important;
+    }
+
+    /* Styling Metric & Box */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     div[data-testid="stMetric"] {
@@ -80,12 +90,11 @@ with st.sidebar:
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     st.divider()
     
-    # Tombol Aktivasi Audio
     st.write("🔔 **Pengaturan Suara**")
     if st.button("🔊 Aktifkan Notifikasi Suara"):
         st.success("Audio Siap!")
     
-    # st.info ini sekarang tetap BIRU (Normal) karena CSS sudah dipisah
+    # Ini harusnya tetap Biru
     st.info("Data Prediksi ditarik dari Excel. Data History disuplai otomatis tiap 15 menit.")
 
 # --- 4. HEADER ---
@@ -180,12 +189,9 @@ if df_pred is not None and not df_pred.empty:
     selisih = h_next - h_now
     threshold = 0.05 
 
-    if abs(selisih) < threshold:
-        tren_status = "↔️ STAGNAN"
-    elif selisih > 0:
-        tren_status = "📈 LEVEL AIR NAIK"
-    else:
-        tren_status = "📉 LEVEL AIR TURUN"
+    tren_status = "↔️ STAGNAN"
+    if selisih > threshold: tren_status = "📈 LEVEL AIR NAIK"
+    elif selisih < -threshold: tren_status = "📉 LEVEL AIR TURUN"
     
     m4.metric("Tren", tren_status)
 
@@ -215,9 +221,7 @@ if df_pred is not None and not df_pred.empty:
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
-    
-    teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
-    fig.add_annotation(x=sekarang, y=1, yref="paper", text=teks_waktu, showarrow=False, font=dict(color="green", size=12), xanchor="left", xshift=5)
+    fig.add_annotation(x=sekarang, y=1, yref="paper", text=f"<b>Saat Ini ({sekarang.strftime('%H:%M')})</b>", showarrow=False, font=dict(color="green"))
     
     fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
     fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")
@@ -234,4 +238,4 @@ if df_pred is not None and not df_pred.empty:
     with f3: 
         if st.button("🔄 Force Refresh", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:
-    st.error("Data prediksi tidak ditemukan atau format kolom Excel salah.")
+    st.error("Data prediksi tidak ditemukan.")

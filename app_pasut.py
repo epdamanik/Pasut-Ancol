@@ -22,31 +22,33 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; }
     
-    /* --- FORCE WARNA ALERT (WASPADA & AWAS) --- */
-    /* Maksa background st.warning jadi Orange */
-    div[data-testid="stNotificationContentWarning"], 
-    div[data-testid="stAlert"] {
-        background-color: #FF8C00 !important; 
-        border: None !important;
+    /* --- KHUSUS WASPADA (st.warning) --- */
+    div[data-testid="stNotificationContentWarning"] {
+        background-color: #FF8C00 !important; /* Orange */
+        border-radius: 10px !important;
     }
-    
-    /* Maksa background st.error jadi Merah */
-    div[data-testid="stNotificationContentError"] {
-        background-color: #FF4B4B !important; 
-        border: None !important;
-    }
-
-    /* Paksa teks jadi hitam pekat & tebal agar kebaca di HP */
-    [data-testid="stAlert"] div {
+    div[data-testid="stNotificationContentWarning"] div {
         color: #000000 !important;
-        font-size: 1.15rem !important;
         font-weight: 800 !important;
     }
-    
-    [data-testid="stAlert"] svg {
+    div[data-testid="stNotificationContentWarning"] svg {
         fill: #000000 !important;
     }
 
+    /* --- KHUSUS AWAS (st.error) --- */
+    div[data-testid="stNotificationContentError"] {
+        background-color: #FF4B4B !important; /* Merah Terang */
+        border-radius: 10px !important;
+    }
+    div[data-testid="stNotificationContentError"] div {
+        color: #000000 !important;
+        font-weight: 800 !important;
+    }
+    div[data-testid="stNotificationContentError"] svg {
+        fill: #000000 !important;
+    }
+
+    /* CSS Metric & Summary Tetap Sama */
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     div[data-testid="stMetric"] {
@@ -78,11 +80,12 @@ with st.sidebar:
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     st.divider()
     
-    # Tombol Pancingan Audio (PENTING BUAT BROWSER)
+    # Tombol Aktivasi Audio
     st.write("🔔 **Pengaturan Suara**")
     if st.button("🔊 Aktifkan Notifikasi Suara"):
         st.success("Audio Siap!")
     
+    # st.info ini sekarang tetap BIRU (Normal) karena CSS sudah dipisah
     st.info("Data Prediksi ditarik dari Excel. Data History disuplai otomatis tiap 15 menit.")
 
 # --- 4. HEADER ---
@@ -147,7 +150,6 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
     
-    # Alert System
     check_values = {"Prediksi": h_now, "AWS": live_data['aws'], "BPBD": live_data['bpbd']}
     awas = [n for n, v in check_values.items() if v is not None and v >= 2.5]
     waspada = [n for n, v in check_values.items() if v is not None and 2.3 <= v < 2.5]
@@ -172,7 +174,7 @@ if df_pred is not None and not df_pred.empty:
     m2.metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m dr prediksi" if live_data['aws'] else None, delta_color="inverse")
     m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
     
-    # --- LOGIKA TREN ---
+    # Logika Tren
     waktu_target = sekarang + timedelta(hours=3)
     h_next = df_pred.loc[(df_pred[col_tgl] - waktu_target).abs().idxmin(), col_val]
     selisih = h_next - h_now
@@ -192,10 +194,8 @@ if df_pred is not None and not df_pred.empty:
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
-    # 1. Garis Prediksi
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', dash='dot')))
     
-    # --- LOGIKA DOT MAX-MIN HARIAN ---
     df_plot['tgl_saja'] = df_plot[col_tgl].dt.date
     for tgl in df_plot['tgl_saja'].unique():
         df_tgl = df_plot[df_plot['tgl_saja'] == tgl]
@@ -204,7 +204,6 @@ if df_pred is not None and not df_pred.empty:
         p_min = df_tgl.loc[df_tgl[col_val].idxmin()]
         fig.add_trace(go.Scatter(x=[p_min[col_tgl]], y=[p_min[col_val]], mode='markers+text', text=[f"<b>{p_min[col_val]:.2f}</b>"], textposition="bottom center", marker=dict(color='blue', size=8, symbol='diamond'), showlegend=False))
 
-    # 2. History AWS & BPBD
     if os.path.exists(FILE_HISTORY_AWS):
         dh_a = pd.read_csv(FILE_HISTORY_AWS); dh_a['waktu'] = pd.to_datetime(dh_a['waktu'], format='mixed', errors='coerce')
         dh_a = dh_a[(dh_a['waktu'] >= t_start) & (dh_a['waktu'] <= t_end) & (dh_a['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
@@ -215,10 +214,8 @@ if df_pred is not None and not df_pred.empty:
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
-    # Garis vertikal waktu saat ini
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
     
-    # Tambahin Teks Anotasi manual
     teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
     fig.add_annotation(x=sekarang, y=1, yref="paper", text=teks_waktu, showarrow=False, font=dict(color="green", size=12), xanchor="left", xshift=5)
     

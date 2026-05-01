@@ -18,7 +18,6 @@ LIMIT_SENSOR_ERROR = 3.5
 
 def save_to_csv(filename, waktu, nilai):
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
-    # Bulatkan ke interval 15 menit terdekat
     menit_bulat = (waktu.minute // 15) * 15
     waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
     waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
@@ -29,7 +28,6 @@ def save_to_csv(filename, waktu, nilai):
     else:
         try:
             old_data = pd.read_csv(filename)
-            # Hapus data lama di jam yang sama agar tidak duplikat
             old_data = old_data[old_data['waktu'] != waktu_str]
             combined = pd.concat([old_data, new_data]).sort_values('waktu')
             combined.to_csv(filename, index=False)
@@ -49,96 +47,71 @@ def run_scraper():
     try:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         
-        # --- SCRAPING AWS BMKG ---
+        # --- AWS BMKG ---
         try:
             print("\n--- Memulai Scraping AWS ---")
-            driver.set_page_load_timeout(30) 
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
-            
             el = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "waterlevel")))
-            time.sleep(3) 
+            time.sleep(3)
+            val = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
+            if val <= LIMIT_SENSOR_ERROR: 
+                res["aws"] = val
+                print(f"✅ Hasil AWS: {val} m")
+        except Exception as e: print(f"❌ Gagal AWS: {e}")
             
-            val_text = el.text.strip()
-            match = re.search(r"(\d+[\.,]?\d*)", val_text)
-            if match:
-                val = float(match.group(1).replace(',', '.'))
-                if val <= LIMIT_SENSOR_ERROR: 
-                    res["aws"] = val
-                    print(f"✅ Hasil AWS: {val} m")
-        except Exception as e: 
-            print(f"❌ Gagal AWS: {e}")
-            
-        # --- SCRAPING BPBD (POSKO BANJIR) ---
+        # --- BPBD (PASAR IKAN) ---
         try:
             print("\n--- Memulai Scraping BPBD ---")
             driver.get("https://poskobanjir.dsdadki.web.id/")
             
+            # Cari baris Pasar Ikan
             xpath_pasar_ikan = "//td[contains(text(), 'Pasar Ikan')]/.."
             row_el = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath_pasar_ikan)))
             
+            # Langsung tembak kolom ke-4 (Index 4) di dalam baris tersebut
+            # Kita ambil span di dalamnya jika ada
             cells = row_el.find_elements(By.TAG_NAME, "td")
-            val_tma = None
             
-            print("Mengecek data (Arah Terbalik: Kanan ke Kiri)...")
-            # Kita cek dari kolom paling belakang untuk menghindari Status Siaga (1, 2, 3, 4)
-            for idx in reversed(range(len(cells))):
-                txt = cells[idx].text.strip()
-                if not txt: continue
-                
-                # Ekstrak angka (desimal/negatif)
-                match_num = re.search(r"(-?\d+[\.,]?\d*)", txt)
-                
-                if match_num:
-                    raw_val = match_num.group(1).replace(',', '.')
-                    temp_val = float(raw_val)
-                    print(f"Kolom [{idx}] terdeteksi: {temp_val}")
+            # Kita coba ambil teks dari kolom 4 dan kolom 5 (cadangan)
+            target_cols = [4, 5, 3] # Urutan prioritas kolom
+            for idx in target_cols:
+                if len(cells) > idx:
+                    raw_text = cells[idx].get_attribute("innerText")
+                    print(f"Cek Kolom [{idx}]: '{raw_text}'")
                     
-                    # LOGIKA FILTER ANTI-SIAGA:
-                    # Abaikan angka bulat 1.0 s/d 4.0 di kolom index besar (biasanya status siaga)
-                    if temp_val in [1.0, 2.0, 3.0, 4.0] and idx > 3:
-                        print(f"--> Kolom [{idx}] dilewati (dicurigai Status Siaga)")
-                        continue
-                    
-                    # Abaikan nomor urut (index 0, 1)
-                    if idx > 1:
-                        # Jika angka ratusan/ribuan (CM)
-                        if abs(temp_val) > 50:
-                            val_tma = temp_val / 100.0
-                        # Jika angka satuan murni (Meter) tapi bukan status siaga bulat
-                        elif -5.0 < temp_val < 5.0 and temp_val != 0:
-                            val_tma = temp_val
-                        
-                        if val_tma is not None:
-                            print(f"✅ Kolom [{idx}] dikonfirmasi sebagai TMA: {val_tma} m")
-                            res["bpbd"] = val_tma
-                            break
+                    # Cari angka dalam teks tersebut
+                    match = re.search(r"(-?\d+)", raw_text)
+                    if match:
+                        num = float(match.group(1))
+                        # Jika angka ratusan (cm), kita konversi. Jika satuan (m), biarkan.
+                        if abs(num) > 10:
+                            final_val = num / 100.0
+                        else:
+                            final_val = num
                             
-            if res["bpbd"] is None:
-                print("❌ Gagal menemukan TMA valid di BPBD")
+                        # Validasi: TMA Pasar Ikan normalnya 1.0m - 2.5m (100-250cm)
+                        if 0.1 < abs(final_val) < LIMIT_SENSOR_ERROR:
+                            res["bpbd"] = final_val
+                            print(f"✅ Kolom [{idx}] valid sebagai TMA: {final_val} m")
+                            break
 
-        except Exception as e: 
-            print(f"❌ Gagal BPBD: {e}")
+        except Exception as e: print(f"❌ Gagal BPBD: {e}")
             
-    except Exception as e:
-        print(f"Critical Driver Error: {e}")
+    except Exception as e: print(f"Driver Error: {e}")
     finally:
         if driver: driver.quit()
-        
     return res
 
 if __name__ == "__main__":
     tz_jkt = pytz.timezone('Asia/Jakarta')
     sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
-    
     print(f"\nEksekusi: {sekarang.strftime('%Y-%m-%d %H:%M:%S')} WIB")
     live_data = run_scraper()
     
     if live_data["aws"] is not None:
         save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
         print(f"STAMP -> AWS: {live_data['aws']} m")
-        
     if live_data["bpbd"] is not None:
-        # Gunakan waktu mundur 15 menit agar sinkron dengan grid data
         waktu_bpbd = sekarang - timedelta(minutes=15)
         save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd, live_data["bpbd"])
         print(f"STAMP -> BPBD: {live_data['bpbd']} m")

@@ -49,7 +49,6 @@ st.markdown("""
         transform: translateY(-5px) !important;
         box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1) !important;
         border-color: #1e40af !important;
-        background-color: #fcfdfe !important;
     }
 
     [data-testid="stMetricLabel"] { color: #1e3a8a !important; font-weight: 700 !important; font-size: 0.85rem !important; }
@@ -73,9 +72,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. LOGIC WAKTU ---
+# --- 2. LOGIC WAKTU (FIX ZONA WAKTU) ---
 tz_jkt = pytz.timezone('Asia/Jakarta')
-sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
+# Pastikan waktu 'sekarang' benar-benar mengikuti zona WIB
+sekarang = datetime.now(tz_jkt)
 
 # --- 3. SIDEBAR ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
@@ -148,7 +148,9 @@ def load_prediction():
     df = pd.read_excel(FILE_PREDIKSI, engine='openpyxl')
     t_col = next((c for c in ['tanggal_prediksi', 'Waktu_WIB', 'Waktu'] if c in df.columns), None)
     v_col = next((c for c in ['wl_prediksi', 'Tinggi_Navigasi_m'] if c in df.columns), None)
-    if t_col: df[t_col] = pd.to_datetime(df[t_col], format='mixed', errors='coerce')
+    if t_col: 
+        # Tetapkan zona waktu WIB pada data prediksi jika belum ada
+        df[t_col] = pd.to_datetime(df[t_col], format='mixed', errors='coerce')
     return df.dropna(subset=[t_col, v_col]).sort_values(t_col), t_col, v_col
 
 # --- 6. EXECUTION ---
@@ -157,7 +159,9 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 
 # --- 7. DISPLAY ---
 if df_pred is not None and not df_pred.empty:
-    h_now = df_pred.loc[(df_pred[col_tgl] - sekarang).abs().idxmin(), col_val]
+    # Cari nilai prediksi terdekat dengan waktu sekarang (harus sama-sama naif atau sama-sama aware)
+    sekarang_naive = sekarang.replace(tzinfo=None)
+    h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
     check = {"Prediksi": h_now, "AWS": live_data['aws'], "BPBD": live_data['bpbd']}
     awas = [n for n, v in check.items() if v and v >= 2.5]
@@ -180,7 +184,7 @@ if df_pred is not None and not df_pred.empty:
     m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws']-h_now):+.2f}m" if live_data['aws'] else None, delta_color="inverse")
     m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd']-h_now):+.2f}m" if live_data["bpbd"] else None, delta_color="inverse")
     
-    h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang + timedelta(hours=3))).abs().idxmin(), col_val]
+    h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
     selisih = h_next - h_now
     icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")
     m4.metric("Tren (3j Kedepan)", f"{icon} {status}")
@@ -191,7 +195,7 @@ if df_pred is not None and not df_pred.empty:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
-        # 1. Garis Prediksi
+        # Garis Prediksi
         fig.add_trace(go.Scatter(
             x=df_plot[col_tgl], y=df_plot[col_val], 
             name='Prediksi', 
@@ -199,7 +203,7 @@ if df_pred is not None and not df_pred.empty:
             line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline'),
         ))
         
-        # 2. History Data
+        # History Data
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'BPBD (Hist)', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
@@ -214,13 +218,14 @@ if df_pred is not None and not df_pred.empty:
                         line=dict(color=color, width=3.5, shape='spline'),
                     ))
 
-        # GARIS SEKARANG (DENGAN FIX TYPEERROR)
+        # GARIS SEKARANG (WIB - TANGGAL, BULAN, JAM)
+        # Gunakan format ISO string agar Plotly tidak bingung zona waktu
         fig.add_vline(
-            x=sekarang.timestamp() * 1000, # Milidetik untuk Plotly JS
+            x=sekarang_naive, 
             line_width=2, 
             line_dash="dash", 
             line_color="#22c55e",
-            annotation_text=f"Sekarang: {sekarang.strftime('%H:%M')}", 
+            annotation_text=f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}", 
             annotation_position="top left"
         )
         
@@ -233,12 +238,7 @@ if df_pred is not None and not df_pred.empty:
             margin=dict(l=10, r=10, t=10, b=10), 
             hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            yaxis=dict(
-                showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)', 
-                title="Tinggi Air (m)",
-                autorange=True,
-                fixedrange=False
-            ),
+            yaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)', title="Tinggi Air (m)", autorange=True),
             xaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)')
         )
         st.plotly_chart(fig, use_container_width=True)

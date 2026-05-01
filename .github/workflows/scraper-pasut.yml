@@ -1,48 +1,45 @@
-name: Auto Scraper TMA Priok
+name: Auto Scraper TMA Priok Ancol
 
 on:
-  # Pemicu utama via API Google Apps Script atau tombol manual
-  workflow_dispatch:
-
-permissions:
-  contents: write
+  schedule:
+    - cron: '*/15 * * * *' # Jalan tiap 15 menit
+  workflow_dispatch: # Bisa di-run manual
 
 jobs:
   scrape-data:
     runs-on: ubuntu-latest
-    
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    
+    permissions:
+      contents: write # Wajib untuk push
+
     steps:
-      - name: Checkout repo
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Ambil semua history biar pull rebase lancar
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Install Dependencies
         run: |
-          pip install selenium webdriver-manager pandas pytz openpyxl
+          pip install pandas selenium webdriver-manager pytz
 
       - name: Eksekusi Background Scraper
-        run: python scraper_khusus.py 
+        run: python scraper_khusus.py
 
       - name: Commit dan Push Hasil CSV ke Repo
         run: |
           git config --global user.name "Bot-Stamar-Priok"
           git config --global user.email "bot@github.com"
           
-          # Pakai wildcard *.csv agar semua file history terdeteksi
-          git add history_aws_priok.csv history_bpbd_pasarikan.csv
+          # Add kedua file secara eksplisit
+          git add history_aws_ancol.csv history_bpbd_pasarikan.csv
           
-          # Cek status file untuk log
-          git status
+          # Commit jika ada perubahan
+          git commit -m "Auto-update data TMA: $(date +'%Y-%m-%d %H:%M') [skip ci]" || echo "No changes"
           
-          # Commit hanya jika ada perubahan. Jika tidak ada, tidak akan error (exit 0)
-          git commit -m "Auto-update data TMA: $(date +'%Y-%m-%d %H:%M') [skip ci]" || echo "Tidak ada perubahan data untuk di-commit"
-          
-          # Push hasil ke repository
+          # Rebase dulu sebelum push untuk menghindari 'rejected'
+          git pull origin main --rebase
           git push origin main

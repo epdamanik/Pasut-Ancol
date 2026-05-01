@@ -191,6 +191,7 @@ if df_pred is not None and not df_pred.empty:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
+        # 1. Garis Prediksi
         fig.add_trace(go.Scatter(
             x=df_plot[col_tgl], y=df_plot[col_val], 
             name='Prediksi', 
@@ -198,6 +199,7 @@ if df_pred is not None and not df_pred.empty:
             line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline'),
         ))
         
+        # 2. History Data
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'BPBD (Hist)', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
@@ -212,9 +214,9 @@ if df_pred is not None and not df_pred.empty:
                         line=dict(color=color, width=3.5, shape='spline'),
                     ))
 
-        # GARIS SEKARANG (DENGAN TEKS WAKTU)
+        # GARIS SEKARANG (DENGAN FIX TYPEERROR)
         fig.add_vline(
-            x=sekarang, 
+            x=sekarang.timestamp() * 1000, # Milidetik untuk Plotly JS
             line_width=2, 
             line_dash="dash", 
             line_color="#22c55e",

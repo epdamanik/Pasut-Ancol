@@ -13,7 +13,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 # --- KONFIGURASI ---
-# Sesuaikan nama file AWS agar sinkron dengan yang ada di laptop (Ancol)
 FILE_HISTORY_AWS = 'history_aws_ancol.csv'
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
 LIMIT_SENSOR_ERROR = 3.5
@@ -35,10 +34,8 @@ def save_to_csv(filename, waktu, nilai):
             new_data.to_csv(filename, index=False)
         else:
             old_data = pd.read_csv(filename)
-            # Bersihkan data agar tidak ada spasi gaib yang bikin gagal push
             old_data['waktu'] = old_data['waktu'].astype(str).str.strip()
             
-            # Gabungkan dan hapus duplikat di jam yang sama
             combined = pd.concat([old_data, new_data])
             combined = combined.drop_duplicates(subset=['waktu'], keep='last').sort_values('waktu')
             combined.to_csv(filename, index=False)
@@ -71,37 +68,35 @@ def run_scraper():
         except Exception as e: 
             print(f"Gagal narik AWS: {e}")
             
-        # --- 2. SCRAPING BPBD DKI (PASAR IKAN) - VERSI ANTI ERROR REGEX ---
+        # --- 2. SCRAPING BPBD DKI (PASAR IKAN) ---
         try:
             print("Mencoba scraping BPBD...")
             driver.get("https://poskobanjir.dsdadki.web.id/")
             
-            # Cari baris yang berisi teks 'Pasar Ikan'
             wait = WebDriverWait(driver, 30)
             row_el = wait.until(EC.presence_of_element_located(
                 (By.XPATH, "//tr[td[contains(., 'Pasar Ikan')]]")
             ))
             
-            # Ambil semua teks di baris tersebut (lebih stabil daripada onclick)
-            row_text = row_el.text
+            row_text = row_el.text.strip()
             print(f"DEBUG: Baris ketemu -> {row_text}")
             
-            # Cari angka pertama yang muncul di baris tersebut
-            match = re.search(r"(\d+[\.,]?\d*)", row_text)
+            # PERBAIKAN REGEX: Cari angka yang didahului teks 'Tinggi Air'
+            # Kita cari kata 'Tinggi Air', abaikan karakter setelahnya sampai ketemu angka
+            match = re.search(r"Tinggi Air.*?(\d+)", row_text)
+            
             if match:
-                raw_val = float(match.group(1).replace(',', '.'))
+                raw_val = float(match.group(1))
                 
-                # Logika pembagi: jika > 500 berarti mm, jika kecil berarti cm
-                if raw_val > 500:
-                    val = raw_val / 1000
-                else:
-                    val = raw_val / 100
+                # Sesuai debug: "Tinggi Air (cm) : 165" -> raw_val = 165
+                # Kita bagi 100 karena satuannya cm di log
+                val = raw_val / 100
                     
                 if 0.0 < val <= LIMIT_SENSOR_ERROR:
                     res["bpbd"] = val
-                    print(f"SUCCESS -> BPBD dapet: {val}m")
+                    print(f"SUCCESS -> BPBD dapet: {val}m (dari raw: {raw_val}cm)")
             else:
-                print("Gagal menemukan angka di teks BPBD")
+                print("Gagal menemukan angka Tinggi Air di teks BPBD")
                 
         except Exception as e: 
             print(f"Gagal narik BPBD: {e}")
@@ -122,15 +117,13 @@ if __name__ == "__main__":
     
     live_data = run_scraper()
     
-    # Simpan AWS
     if live_data["aws"] is not None:
         save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-        print(f"LOG: File AWS ({FILE_HISTORY_AWS}) diperbarui: {live_data['aws']}m")
+        print(f"LOG: File AWS diperbarui: {live_data['aws']}m")
     
-    # Simpan BPBD
     if live_data["bpbd"] is not None:
         save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
-        print(f"LOG: File BPBD ({FILE_HISTORY_BPBD}) diperbarui: {live_data['bpbd']}m")
+        print(f"LOG: File BPBD diperbarui: {live_data['bpbd']}m")
     else:
         print("LOG: Data BPBD kosong, tidak ada yang disimpan.")
 

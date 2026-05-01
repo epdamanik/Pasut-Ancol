@@ -180,13 +180,14 @@ if df_pred is not None and not df_pred.empty:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
+        # Prediksi
         fig.add_trace(go.Scatter(
             x=df_plot[col_tgl], y=df_plot[col_val], 
-            name='Prediksi', 
-            mode='lines',
+            name='Prediksi', mode='lines',
             line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline'),
         ))
         
+        # History
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'BPBD (Hist)', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
@@ -195,31 +196,33 @@ if df_pred is not None and not df_pred.empty:
                 if not dh.empty:
                     fig.add_trace(go.Scatter(
                         x=dh['waktu'], y=dh['nilai'], 
-                        name=label, 
-                        connectgaps=True, 
-                        mode='lines',
+                        name=label, connectgaps=True, mode='lines',
                         line=dict(color=color, width=3.5, shape='spline'),
                     ))
 
-        # GARIS SEKARANG (FIXED TYPEERROR DENGAN ISO STRING)
-        fig.add_vline(
-            x=sekarang_naive.strftime("%Y-%m-%d %H:%M:%S"), 
-            line_width=2, 
-            line_dash="dash", 
-            line_color="#22c55e",
-            annotation_text=f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}", 
-            annotation_position="top left"
-        )
+        # --- LOGIKA BARU GARIS SEKARANG (ANTI-CRASH) ---
+        # Kita pakai Scatter dengan y minimal ke maksimal untuk bikin garis vertikal manual
+        y_min_val = df_plot[col_val].min() if not df_plot.empty else 0
+        y_max_val = 3.0 # Angka aman di atas AWAS
         
-        fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS", annotation_position="top right")
-        fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="WASPADA", annotation_position="top right")
+        fig.add_trace(go.Scatter(
+            x=[sekarang_naive, sekarang_naive],
+            y=[y_min_val, y_max_val],
+            mode="lines+text",
+            name="Waktu Sekarang",
+            line=dict(color="#22c55e", width=2, dash="dash"),
+            text=[f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}", ""],
+            textposition="top left",
+            showlegend=False
+        ))
+        
+        # Threshold (Tetap pakai add_hline karena biasanya stabil kalau gak pake annotation aneh-aneh)
+        fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444")
+        fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c")
         
         fig.update_layout(
-            height=500, 
-            template="plotly_white", 
-            margin=dict(l=10, r=10, t=10, b=10), 
-            hovermode="x unified",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=500, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10), 
+            hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             yaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)', title="Tinggi Air (m)", autorange=True),
             xaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)')
         )

@@ -58,51 +58,46 @@ def run_scraper():
             print(f"✅ AWS: {val} m")
         except Exception as e: print(f"❌ AWS Gagal: {e}")
             
-        # --- BPBD (METODE SEARCH & SCAN) ---
+        # --- BPBD (PASAR IKAN) ---
         try:
-            print("\n--- Scraping BPBD (Metode Search & Scan) ---")
+            print("\n--- Scraping BPBD (Metode Deep Scan 3.0) ---")
             driver.get("https://poskobanjir.dsdadki.web.id/")
-            
-            # TUNGGU LAMA: Pastikan tabel beneran kelar loading
-            WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_CtrlDataTinggiAir_GridListPintuAir_DXMainTable")))
-            time.sleep(10) 
-            
-            # Cari SEMUA cell di tabel
-            print("Mencari data Pasar Ikan di tabel...")
-            rows = driver.find_elements(By.XPATH, "//tr[contains(@class, 'dxgvDataRow')]")
-            
-            for row in rows:
-                if "Pasar Ikan" in row.text:
-                    print(f"Ketemu Baris: {row.text}")
-                    # Ambil semua <td> di baris ini
-                    cells = row.find_elements(By.TAG_NAME, "td")
-                    
-                    # Kita cari angka di tiap kolom, tapi kita lewati kolom nama
-                    for idx, cell in enumerate(cells):
-                        txt = cell.text.strip()
-                        # Regex untuk mencari angka 3 digit (TMA CM)
-                        match = re.search(r"^(\d{3})$", txt)
-                        if match:
-                            tma_cm = float(match.group(1))
-                            # Validasi: TMA Pasar Ikan biasanya 100-300cm
-                            if 100 <= tma_cm <= 350:
-                                res["bpbd"] = tma_cm / 100.0
-                                print(f"✅ BPBD Berhasil: {res['bpbd']} m (Kolom {idx})")
-                                break
-                    if res["bpbd"]: break
+            time.sleep(15) # Kasih waktu extra lama buat JS render
 
-            # FALLBACK: Jika masih gagal, scan seluruh span yang punya angka TMA
+            # Skenario 1: Cari Baris Pasar Ikan secara kasar di seluruh teks
+            print("Mencari baris Pasar Ikan...")
+            all_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'Pasar Ikan')]/ancestor::tr")
+            
+            for row in all_elements:
+                row_text = row.get_attribute("innerText")
+                print(f"DEBUG: Teks Baris ditemukan -> {row_text}")
+                
+                # Cari angka 3 digit di dalam baris itu
+                nums = re.findall(r"(\d{3})", row_text)
+                for n in nums:
+                    val_n = int(n)
+                    if 100 <= val_n <= 350: # Range normal Pasar Ikan (cm)
+                        res["bpbd"] = val_n / 100.0
+                        print(f"✅ BPBD Berhasil (Row Text): {res['bpbd']} m")
+                        break
+                if res["bpbd"]: break
+
+            # Skenario 2: Kalau masih gagal, ambil SEMUA angka di page yang masuk range
             if not res["bpbd"]:
-                print("Metode baris gagal, mencoba Scan Seluruh Halaman...")
-                spans = driver.find_elements(By.TAG_NAME, "span")
-                for s in spans:
-                    t = s.text.strip()
-                    if t.isdigit() and 100 <= int(t) <= 300:
-                        # Pastikan ini angka TMA dengan cek sekitarnya atau ID-nya
-                        parent_text = s.find_element(By.XPATH, "./..").get_attribute("innerText")
-                        if len(t) == 3: # TMA CM biasanya 3 digit
-                            res["bpbd"] = int(t) / 100.0
-                            print(f"✅ BPBD Berhasil (Scan): {res['bpbd']} m")
+                print("Skenario 1 gagal, mencari angka 100-350 di seluruh page...")
+                all_text = driver.find_element(By.TAG_NAME, "body").get_attribute("innerText")
+                # Cari angka di deket kata 'Pasar Ikan'
+                pos = all_text.find("Pasar Ikan")
+                if pos != -1:
+                    # Ambil 200 karakter setelah kata Pasar Ikan
+                    snippet = all_text[pos:pos+200]
+                    print(f"DEBUG: Snippet sekitar Pasar Ikan -> {snippet}")
+                    nums = re.findall(r"(\d{3})", snippet)
+                    for n in nums:
+                        val_n = int(n)
+                        if 100 <= val_n <= 350:
+                            res["bpbd"] = val_n / 100.0
+                            print(f"✅ BPBD Berhasil (Snippet): {res['bpbd']} m")
                             break
 
         except Exception as e: print(f"❌ BPBD Gagal: {e}")
@@ -120,7 +115,7 @@ if __name__ == "__main__":
     
     if live_data["aws"] is not None:
         save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-        print(f"STAMP -> AWS: {live_data['aws']} m")
+        print(f"SUCCESS AWS: {live_data['aws']} m")
     if live_data["bpbd"] is not None:
         save_to_csv(FILE_HISTORY_BPBD, sekarang - timedelta(minutes=15), live_data["bpbd"])
-        print(f"STAMP -> BPBD: {live_data['bpbd']} m")
+        print(f"SUCCESS BPBD: {live_data['bpbd']} m")

@@ -47,7 +47,7 @@ def run_scraper():
     try:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         
-        # --- AWS (SUDAH AMAN) ---
+        # --- AWS (STABIL) ---
         try:
             print("\n--- Scraping AWS ---")
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
@@ -58,39 +58,49 @@ def run_scraper():
             print(f"✅ AWS: {val} m")
         except Exception as e: print(f"❌ AWS Gagal: {e}")
             
-        # --- BPBD (PASAR IKAN) - JURUS BARU ---
+        # --- BPBD (DYNAMIC COORDINATE) ---
         try:
-            print("\n--- Scraping BPBD (Metode Deep Scan) ---")
+            print("\n--- Scraping BPBD (Hybrid Method) ---")
             driver.get("https://poskobanjir.dsdadki.web.id/")
-            time.sleep(10) # Kasih waktu lebih lama buat tabel beneran muncul
+            time.sleep(10) # Tunggu loading table
             
-            # Kita cari SEMUA elemen yang mengandung kata 'Pasar Ikan'
-            # Lalu kita cari elemen angka di sekitarnya yang punya ID spesifik dari BPBD
-            # Berdasarkan input lu: cell10_4_ASPxLabel1_10
+            # 1. Cari baris yang ada teks "Pasar Ikan"
+            print("Mencari baris Pasar Ikan...")
+            target_row = driver.find_element(By.XPATH, "//td[contains(text(), 'Pasar Ikan')]/..")
             
-            try:
-                # Target langsung ke ID yang lu kasih (tapi pake filter partial karena ID sering berubah dikit)
-                tma_el = driver.find_element(By.XPATH, "//*[contains(@id, 'cell10_4_ASPxLabel1')]")
-                raw_val = tma_el.text.strip()
-                print(f"Target ID Found! Raw: {raw_val}")
-            except:
-                # Kalau gagal, cari manual angka yang paling masuk akal (3 digit) di seluruh page
-                print("ID tidak ketemu, scanning seluruh tabel...")
+            # 2. Ambil ID dari baris tersebut untuk mendeteksi nomor baris (misal: cell10)
+            # Kita cari elemen <td> di dalamnya yang punya ID berformat cellX_Y
+            sample_cell = target_row.find_element(By.XPATH, ".//td[contains(@id, 'cell')]")
+            full_id = sample_cell.get_attribute("id") # Contoh: Content...cell10_0
+            
+            # Ekstrak nomor barisnya (misal '10') menggunakan regex
+            row_match = re.search(r"cell(\d+)_", full_id)
+            
+            if row_match:
+                row_num = row_match.group(1)
+                print(f"Detected Pasar Ikan at Row: {row_num}")
+                
+                # 3. Tembak kolom 4 di baris tersebut
+                target_id = f"cell{row_num}_4"
+                print(f"Targeting Dynamic ID: {target_id}")
+                
+                final_el = driver.find_element(By.XPATH, f"//*[contains(@id, '{target_id}')]")
+                raw_val = final_el.text.strip()
+                
+                if raw_val:
+                    tma_cm = float(raw_val)
+                    res["bpbd"] = tma_cm / 100.0
+                    print(f"✅ BPBD Berhasil (Dynamic): {res['bpbd']} m")
+            else:
+                print("Gagal mendeteksi index baris, menggunakan Deep Scan...")
+                # Fallback ke metode Deep Scan yang kemarin kalau ID baris gagal dideteksi
                 all_spans = driver.find_elements(By.TAG_NAME, "span")
-                raw_val = ""
                 for s in all_spans:
                     txt = s.text.strip()
                     if txt.isdigit() and 100 <= int(txt) <= 350:
-                        raw_val = txt
-                        print(f"Potential TMA found in span: {raw_val}")
+                        res["bpbd"] = int(txt) / 100.0
+                        print(f"✅ BPBD Berhasil (Deep Scan): {res['bpbd']} m")
                         break
-            
-            if raw_val:
-                tma_cm = float(raw_val)
-                res["bpbd"] = tma_cm / 100.0
-                print(f"✅ BPBD Berhasil: {res['bpbd']} m")
-            else:
-                print("❌ BPBD Tetap Gagal nemu angka.")
 
         except Exception as e: print(f"❌ BPBD Gagal: {e}")
             

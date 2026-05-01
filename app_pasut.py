@@ -56,7 +56,7 @@ st.markdown("""
         background-color: #f8fafc; border: 1px solid #e2e8f0; 
         text-align: center;
     }
-    .dev-name { color: #475569; font-weight: 400; font-size: 0.72rem; margin-top: 2px; display: block; }
+    .dev-name { color: #475569; font-weight: 400; font-size: 0.55rem; margin-top: 2px; display: block; }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -95,7 +95,7 @@ with st.sidebar:
     st.markdown(f"""
         <div class="footer-card">
             <p style='font-size: 0.7rem; color: #1e3a8a; margin-bottom: 0;'>© 2026 Stamar Tanjung Priok</p>
-            <p style='font-size: 0.5rem; color: #64748b; margin-top: 4px;'>
+            <p style='font-size: 0.6rem; color: #64748b; margin-top: 4px;'>
                 Developed by <br>
                 <span class="dev-name">E.P. Damanik</span>
             </p>

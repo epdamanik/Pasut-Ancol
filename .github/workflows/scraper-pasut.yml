@@ -2,11 +2,12 @@ name: Auto Scraper TMA Priok
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # Jalan otomatis tiap 15 menit
-  workflow_dispatch: # Biar lu bisa klik manual kapan aja
+    - cron: '*/15 * * * *' 
+  workflow_dispatch: 
 
 permissions:
-  contents: write # Izin wajib buat nulis data ke repo
+  contents: write
+  actions: write # INI KUNCINYA: Biar gak ditolak pas push
 
 jobs:
   scrape-data:
@@ -18,6 +19,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -31,11 +34,16 @@ jobs:
       - name: Eksekusi Background Scraper
         run: python scraper_khusus.py 
 
-      - name: Commit dan Push Hasil CSV
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Auto-update data TMA [skip ci]"
-          file_pattern: 'history_aws_priok.csv history_bpbd_pasarikan.csv'
-          # Hanya commit kalau ada perubahan di file CSV
-          skip_dirty_check: false    
-          branch: main
+      - name: Commit dan Push Hasil CSV ke Repo
+        run: |
+          git config --global user.name "Bot-Stamar-Priok"
+          git config --global user.email "bot@github.com"
+          
+          # Tambahkan file CSV
+          git add history_aws_priok.csv history_bpbd_pasarikan.csv
+          
+          # Commit jika ada perubahan
+          git commit -m "Auto-update data TMA [skip ci]" || exit 0
+          
+          # GUNAKAN GITHUB_TOKEN Bawaan biar tembus permission
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main --force

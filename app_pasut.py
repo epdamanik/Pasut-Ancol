@@ -26,7 +26,7 @@ st.markdown("""
     
     /* 1. Atur wadah putih (popover) agar fit dengan kalender */
     div[data-baseweb="popover"] {
-        top: 60px !important; 
+        top: 90px !important; 
         bottom: auto !important;
         transform: none !important;
         /* Biar wadahnya gak kebesaran */

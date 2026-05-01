@@ -22,23 +22,31 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; }
     
-    /* Perbaikan agar tulisan alert jelas & Ubah Background Waspada ke Orange */
-    [data-testid="stAlert"] {
-        border-radius: 10px !important;
+    /* --- FORCE WARNA ALERT (WASPADA & AWAS) --- */
+    /* Maksa background st.warning jadi Orange */
+    div[data-testid="stNotificationContentWarning"], 
+    div[data-testid="stAlert"] {
+        background-color: #FF8C00 !important; 
+        border: None !important;
     }
     
-    /* Maksa background st.warning jadi Orange */
-    div[data-testid="stNotificationContentWarning"] {
-        background-color: #ff9800 !important;
-        color: #000000 !important;
+    /* Maksa background st.error jadi Merah */
+    div[data-testid="stNotificationContentError"] {
+        background-color: #FF4B4B !important; 
+        border: None !important;
     }
 
-    [data-testid="stAlert"] * {
-        color: #0f172a !important; 
-        font-size: 1.1rem !important;
-        font-weight: 700 !important;
+    /* Paksa teks jadi hitam pekat & tebal agar kebaca di HP */
+    [data-testid="stAlert"] div {
+        color: #000000 !important;
+        font-size: 1.15rem !important;
+        font-weight: 800 !important;
     }
     
+    [data-testid="stAlert"] svg {
+        fill: #000000 !important;
+    }
+
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 850 !important; color: #0f172a !important; }
     div[data-testid="stMetric"] {
@@ -69,6 +77,12 @@ with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     st.divider()
+    
+    # Tombol Pancingan Audio (PENTING BUAT BROWSER)
+    st.write("🔔 **Pengaturan Suara**")
+    if st.button("🔊 Aktifkan Notifikasi Suara"):
+        st.success("Audio Siap!")
+    
     st.info("Data Prediksi ditarik dari Excel. Data History disuplai otomatis tiap 15 menit.")
 
 # --- 4. HEADER ---
@@ -97,7 +111,11 @@ def play_audio(file_path):
         with open(file_path, "rb") as f:
             data = f.read()
             b64 = base64.b64encode(data).decode()
-            audio_html = f'<audio autoplay><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
+            audio_html = f'''
+                <audio autoplay="true">
+                    <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+                </audio>
+            '''
             st.components.v1.html(audio_html, height=0)
 
 def get_latest_from_csv(file_path):
@@ -135,10 +153,10 @@ if df_pred is not None and not df_pred.empty:
     waspada = [n for n, v in check_values.items() if v is not None and 2.3 <= v < 2.5]
 
     if awas:
-        st.error(f"**🚨 STATUS: AWAS ROB! ({', '.join(awas)})**", icon="⚠️")
+        st.error(f"🚨 STATUS: AWAS ROB! ({', '.join(awas)})", icon="⚠️")
         play_audio("AWAS ROB.mp3") 
     elif waspada:
-        st.warning(f"**⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})**", icon="📢")
+        st.warning(f"⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
         play_audio("waspada ROB.mp3")
 
     # Summary Today
@@ -154,11 +172,11 @@ if df_pred is not None and not df_pred.empty:
     m2.metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m dr prediksi" if live_data['aws'] else None, delta_color="inverse")
     m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
     
-    # --- LOGIKA TREN (2 Jam ke Depan + Stagnan) ---
+    # --- LOGIKA TREN ---
     waktu_target = sekarang + timedelta(hours=3)
     h_next = df_pred.loc[(df_pred[col_tgl] - waktu_target).abs().idxmin(), col_val]
     selisih = h_next - h_now
-    threshold = 0.05 # Threshold 5 cm
+    threshold = 0.05 
 
     if abs(selisih) < threshold:
         tren_status = "↔️ STAGNAN"
@@ -177,30 +195,14 @@ if df_pred is not None and not df_pred.empty:
     # 1. Garis Prediksi
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#64748b', dash='dot')))
     
-    # --- TAMBAHAN: LOGIKA DOT MAX-MIN HARIAN ---
+    # --- LOGIKA DOT MAX-MIN HARIAN ---
     df_plot['tgl_saja'] = df_plot[col_tgl].dt.date
     for tgl in df_plot['tgl_saja'].unique():
         df_tgl = df_plot[df_plot['tgl_saja'] == tgl]
-        # Cari Max Harian
         p_max = df_tgl.loc[df_tgl[col_val].idxmax()]
-        fig.add_trace(go.Scatter(
-            x=[p_max[col_tgl]], y=[p_max[col_val]],
-            mode='markers+text',
-            text=[f"<b>{p_max[col_val]:.2f}</b>"],
-            textposition="top center",
-            marker=dict(color='red', size=8, symbol='diamond'),
-            name=f"Max {tgl}", showlegend=False
-        ))
-        # Cari Min Harian
+        fig.add_trace(go.Scatter(x=[p_max[col_tgl]], y=[p_max[col_val]], mode='markers+text', text=[f"<b>{p_max[col_val]:.2f}</b>"], textposition="top center", marker=dict(color='red', size=8, symbol='diamond'), showlegend=False))
         p_min = df_tgl.loc[df_tgl[col_val].idxmin()]
-        fig.add_trace(go.Scatter(
-            x=[p_min[col_tgl]], y=[p_min[col_val]],
-            mode='markers+text',
-            text=[f"<b>{p_min[col_val]:.2f}</b>"],
-            textposition="bottom center",
-            marker=dict(color='blue', size=8, symbol='diamond'),
-            name=f"Min {tgl}", showlegend=False
-        ))
+        fig.add_trace(go.Scatter(x=[p_min[col_tgl]], y=[p_min[col_val]], mode='markers+text', text=[f"<b>{p_min[col_val]:.2f}</b>"], textposition="bottom center", marker=dict(color='blue', size=8, symbol='diamond'), showlegend=False))
 
     # 2. History AWS & BPBD
     if os.path.exists(FILE_HISTORY_AWS):
@@ -218,16 +220,7 @@ if df_pred is not None and not df_pred.empty:
     
     # Tambahin Teks Anotasi manual
     teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
-    fig.add_annotation(
-        x=sekarang,
-        y=1,             
-        yref="paper",    
-        text=teks_waktu,
-        showarrow=False,
-        font=dict(color="green", size=12),
-        xanchor="left",  
-        xshift=5         
-    )
+    fig.add_annotation(x=sekarang, y=1, yref="paper", text=teks_waktu, showarrow=False, font=dict(color="green", size=12), xanchor="left", xshift=5)
     
     fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="<b>AWAS ROB</b>")
     fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="<b>WASPADA</b>")

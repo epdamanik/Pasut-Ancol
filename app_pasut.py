@@ -95,7 +95,7 @@ with st.sidebar:
     st.markdown(f"""
         <div class="footer-card">
             <p style='font-size: 0.7rem; color: #1e3a8a; margin-bottom: 0;'>© 2026 Stamar Tanjung Priok</p>
-            <p style='font-size: 0.6rem; color: #64748b; margin-top: 4px;'>
+            <p style='font-size: 0.5rem; color: #64748b; margin-top: 4px;'>
                 Developed by <br>
                 <span class="dev-name">E.P. Damanik</span>
             </p>
@@ -258,8 +258,8 @@ if df_pred is not None and not df_pred.empty:
 
     st.divider()
     c1, c2, c3 = st.columns(3)
-    with c1: st.download_button("📥 AWS CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "aws.csv", use_container_width=True)
-    with c2: st.download_button("📥 BPBD CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "bpbd.csv", use_container_width=True)
+    with c1: st.download_button("📥 Scrape AWS Maritim Tj. Priok CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "AWS.csv", use_container_width=True)
+    with c2: st.download_button("📥 Scrape Pintu air Pasar Ikan I CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "Pasarikan.csv", use_container_width=True)
     with c3: 
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:

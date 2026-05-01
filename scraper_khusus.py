@@ -75,27 +75,35 @@ def run_scraper():
             print("Mencoba scraping BPBD...")
             driver.get("https://poskobanjir.dsdadki.web.id/")
             
-            # Tunggu sampe tabel Pasar Ikan muncul. Pake XPATH yang lebih spesifik.
+            # Tunggu sampe tabel beneran muncul
             xpath_pasar_ikan = "//td[contains(text(), 'Pasar Ikan')]/.."
             row_el = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath_pasar_ikan)))
             
-            # Ambil semua text di baris itu
-            row_text = row_el.text
-            print(f"Baris BPBD ditemukan: {row_text}")
+            # Ambil semua cell (td) di baris Pasar Ikan
+            cells = row_el.find_elements(By.TAG_NAME, "td")
             
-            # Cari angka (satuan cm) di baris tersebut
-            # Biasanya formatnya: "Pasar Ikan ... 1800 ... dst"
-            numbers = re.findall(r"(\d+)", row_text)
-            if numbers:
-                # Ambil angka pertama yang masuk akal sebagai TMA (biasanya ribuan/ratusan)
-                # Kita cari angka yang > 100 karena satuannya cm
-                for n in numbers:
-                    val_cm = float(n)
-                    if val_cm > 10: # Filter angka kecil yang mungkin bukan TMA
-                        val = val_cm / 100.0 # Convert ke meter
-                        if val <= LIMIT_SENSOR_ERROR: 
-                            res["bpbd"] = val
-                            break
+            # Biasanya Tinggi Air ada di kolom ke-4 atau ke-5
+            # Kita cari angka yang paling masuk akal (biasanya 3-4 digit dalam cm)
+            val_tma = None
+            for cell in cells:
+                txt = cell.text.strip()
+                # Cari angka yang berdiri sendiri dan bukan nomor urut (No: 11)
+                # Kita cari angka yang nilainya biasanya antara -500 sampai 4000 (cm)
+                if txt.isdigit():
+                    temp_val = float(txt)
+                    # Jika angka > 50 (biar gak ambil No urut atau status siaga)
+                    if temp_val > 50: 
+                        val_tma = temp_val
+                        break
+            
+            if val_tma is not None:
+                val = val_tma / 100.0 # Convert cm ke meter
+                print(f"Dapet TMA Pasar Ikan: {val}m (dari {val_tma}cm)")
+                if val <= LIMIT_SENSOR_ERROR: 
+                    res["bpbd"] = val
+            else:
+                print("Gagal nemu angka TMA yang valid di baris Pasar Ikan")
+
         except Exception as e: 
             print(f"Gagal narik BPBD: {e}")
             

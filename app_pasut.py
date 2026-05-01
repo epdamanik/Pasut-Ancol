@@ -51,7 +51,7 @@ with st.sidebar:
     st.subheader("🗓️ Filter Grafik")
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     st.divider()
-    st.info("Data Prediksi ditarik dari Excel. Data History disuplai otomatis oleh Robot GitHub tiap 15 menit.")
+    st.info("Data Prediksi ditarik dari Excel. Data History disuplai otomatis tiap 15 menit.")
 
 # --- 4. HEADER ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 

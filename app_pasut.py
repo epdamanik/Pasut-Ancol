@@ -56,7 +56,7 @@ st.markdown("""
         background-color: #f8fafc; border: 1px solid #e2e8f0; 
         text-align: center;
     }
-    .dev-name { color: #475569; font-weight: 400; font-size: 0.72rem; margin-top: 4px; display: block; }
+    .dev-name { color: #475569; font-weight: 400; font-size: 0.72rem; margin-top: 2px; display: block; }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -187,27 +187,31 @@ if df_pred is not None and not df_pred.empty:
             line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline'),
         ))
         
-        # --- TAMBAHAN: DOT MAX & MIN PREDIKSI ---
-        idx_max = df_plot[col_val].idxmax()
-        idx_min = df_plot[col_val].idxmin()
+        # --- LOGIKA BARU: DOT MAX & MIN SETIAP HARI ---
+        unique_days = df_plot[col_tgl].dt.date.unique()
         
-        # Dot Max
-        fig.add_trace(go.Scatter(
-            x=[df_plot.loc[idx_max, col_tgl]], y=[df_plot.loc[idx_max, col_val]],
-            mode='markers+text', name='Max Prediksi',
-            marker=dict(color='#ef4444', size=10, symbol='circle'),
-            text=[f"MAX {df_plot.loc[idx_max, col_val]:.2f}m"],
-            textposition="top center", showlegend=False
-        ))
-        
-        # Dot Min
-        fig.add_trace(go.Scatter(
-            x=[df_plot.loc[idx_min, col_tgl]], y=[df_plot.loc[idx_min, col_val]],
-            mode='markers+text', name='Min Prediksi',
-            marker=dict(color='#3b82f6', size=10, symbol='circle'),
-            text=[f"MIN {df_plot.loc[idx_min, col_val]:.2f}m"],
-            textposition="bottom center", showlegend=False
-        ))
+        for day in unique_days:
+            df_day = df_plot[df_plot[col_tgl].dt.date == day]
+            idx_max = df_day[col_val].idxmax()
+            idx_min = df_day[col_val].idxmin()
+            
+            # Marker Max Harian
+            fig.add_trace(go.Scatter(
+                x=[df_day.loc[idx_max, col_tgl]], y=[df_day.loc[idx_max, col_val]],
+                mode='markers+text', name=f'Max {day}',
+                marker=dict(color='#ef4444', size=8, symbol='circle'),
+                text=[f"{df_day.loc[idx_max, col_val]:.2f}"],
+                textposition="top center", showlegend=False
+            ))
+            
+            # Marker Min Harian
+            fig.add_trace(go.Scatter(
+                x=[df_day.loc[idx_min, col_tgl]], y=[df_day.loc[idx_min, col_val]],
+                mode='markers+text', name=f'Min {day}',
+                marker=dict(color='#3b82f6', size=8, symbol='circle'),
+                text=[f"{df_day.loc[idx_min, col_val]:.2f}"],
+                textposition="bottom center", showlegend=False
+            ))
 
         # 2. History Data
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'BPBD (Hist)', '#f59e0b')]:

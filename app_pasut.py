@@ -22,16 +22,18 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
 
-    /* --- FIX POSISI & UKURAN KALENDER --- */
-    /* 1. Atur posisi pop-up agar pas di bawah kotak input */
-    div[data-testid="stDateInput"] div[role="presentation"] {
-        top: 100% !important;
-        left: 0 !important;
-    }
+    /* --- FIX POSISI & UKURAN KALENDER (SUPER FORCE) --- */
     
-    /* 2. Hajar kontainer utama kalender agar mengecil */
+    /* 1. Paksa kontainer popover kalender pindah ke bawah kotak input */
+    div[data-baseweb="popover"] {
+        top: 60px !important; /* Geser manual ke bawah kotak input */
+        bottom: auto !important;
+        transform: none !important; /* Hilangkan kalkulasi otomatis Streamlit */
+    }
+
+    /* 2. Hajar kontainer kalender agar mengecil (0.8 adalah ukuran paling aman) */
     div[data-baseweb="calendar"] {
-        transform: scale(0.8) !important; /* Ukuran 80% */
+        transform: scale(0.8) !important;
         transform-origin: top left !important;
         background-color: #ffffff !important;
         border-radius: 8px !important;
@@ -40,7 +42,7 @@ st.markdown("""
 
     /* 3. Rampingkan kotak input di sidebar */
     div[data-testid="stDateInput"] {
-        max-width: 85% !important;
+        max-width: 90% !important;
         margin: 0 auto !important;
     }
 

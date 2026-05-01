@@ -58,49 +58,52 @@ def run_scraper():
             print(f"✅ AWS: {val} m")
         except Exception as e: print(f"❌ AWS Gagal: {e}")
             
-        # --- BPBD (DYNAMIC COORDINATE) ---
+        # --- BPBD (METODE SEARCH & SCAN) ---
         try:
-            print("\n--- Scraping BPBD (Hybrid Method) ---")
+            print("\n--- Scraping BPBD (Metode Search & Scan) ---")
             driver.get("https://poskobanjir.dsdadki.web.id/")
-            time.sleep(10) # Tunggu loading table
             
-            # 1. Cari baris yang ada teks "Pasar Ikan"
-            print("Mencari baris Pasar Ikan...")
-            target_row = driver.find_element(By.XPATH, "//td[contains(text(), 'Pasar Ikan')]/..")
+            # TUNGGU LAMA: Pastikan tabel beneran kelar loading
+            WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_CtrlDataTinggiAir_GridListPintuAir_DXMainTable")))
+            time.sleep(10) 
             
-            # 2. Ambil ID dari baris tersebut untuk mendeteksi nomor baris (misal: cell10)
-            # Kita cari elemen <td> di dalamnya yang punya ID berformat cellX_Y
-            sample_cell = target_row.find_element(By.XPATH, ".//td[contains(@id, 'cell')]")
-            full_id = sample_cell.get_attribute("id") # Contoh: Content...cell10_0
+            # Cari SEMUA cell di tabel
+            print("Mencari data Pasar Ikan di tabel...")
+            rows = driver.find_elements(By.XPATH, "//tr[contains(@class, 'dxgvDataRow')]")
             
-            # Ekstrak nomor barisnya (misal '10') menggunakan regex
-            row_match = re.search(r"cell(\d+)_", full_id)
-            
-            if row_match:
-                row_num = row_match.group(1)
-                print(f"Detected Pasar Ikan at Row: {row_num}")
-                
-                # 3. Tembak kolom 4 di baris tersebut
-                target_id = f"cell{row_num}_4"
-                print(f"Targeting Dynamic ID: {target_id}")
-                
-                final_el = driver.find_element(By.XPATH, f"//*[contains(@id, '{target_id}')]")
-                raw_val = final_el.text.strip()
-                
-                if raw_val:
-                    tma_cm = float(raw_val)
-                    res["bpbd"] = tma_cm / 100.0
-                    print(f"✅ BPBD Berhasil (Dynamic): {res['bpbd']} m")
-            else:
-                print("Gagal mendeteksi index baris, menggunakan Deep Scan...")
-                # Fallback ke metode Deep Scan yang kemarin kalau ID baris gagal dideteksi
-                all_spans = driver.find_elements(By.TAG_NAME, "span")
-                for s in all_spans:
-                    txt = s.text.strip()
-                    if txt.isdigit() and 100 <= int(txt) <= 350:
-                        res["bpbd"] = int(txt) / 100.0
-                        print(f"✅ BPBD Berhasil (Deep Scan): {res['bpbd']} m")
-                        break
+            for row in rows:
+                if "Pasar Ikan" in row.text:
+                    print(f"Ketemu Baris: {row.text}")
+                    # Ambil semua <td> di baris ini
+                    cells = row.find_elements(By.TAG_NAME, "td")
+                    
+                    # Kita cari angka di tiap kolom, tapi kita lewati kolom nama
+                    for idx, cell in enumerate(cells):
+                        txt = cell.text.strip()
+                        # Regex untuk mencari angka 3 digit (TMA CM)
+                        match = re.search(r"^(\d{3})$", txt)
+                        if match:
+                            tma_cm = float(match.group(1))
+                            # Validasi: TMA Pasar Ikan biasanya 100-300cm
+                            if 100 <= tma_cm <= 350:
+                                res["bpbd"] = tma_cm / 100.0
+                                print(f"✅ BPBD Berhasil: {res['bpbd']} m (Kolom {idx})")
+                                break
+                    if res["bpbd"]: break
+
+            # FALLBACK: Jika masih gagal, scan seluruh span yang punya angka TMA
+            if not res["bpbd"]:
+                print("Metode baris gagal, mencoba Scan Seluruh Halaman...")
+                spans = driver.find_elements(By.TAG_NAME, "span")
+                for s in spans:
+                    t = s.text.strip()
+                    if t.isdigit() and 100 <= int(t) <= 300:
+                        # Pastikan ini angka TMA dengan cek sekitarnya atau ID-nya
+                        parent_text = s.find_element(By.XPATH, "./..").get_attribute("innerText")
+                        if len(t) == 3: # TMA CM biasanya 3 digit
+                            res["bpbd"] = int(t) / 100.0
+                            print(f"✅ BPBD Berhasil (Scan): {res['bpbd']} m")
+                            break
 
         except Exception as e: print(f"❌ BPBD Gagal: {e}")
             
@@ -117,7 +120,7 @@ if __name__ == "__main__":
     
     if live_data["aws"] is not None:
         save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-        print(f"SUCCESS AWS: {live_data['aws']}m")
+        print(f"STAMP -> AWS: {live_data['aws']} m")
     if live_data["bpbd"] is not None:
         save_to_csv(FILE_HISTORY_BPBD, sekarang - timedelta(minutes=15), live_data["bpbd"])
-        print(f"SUCCESS BPBD: {live_data['bpbd']}m")
+        print(f"STAMP -> BPBD: {live_data['bpbd']} m")

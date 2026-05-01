@@ -22,27 +22,38 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
 
-    /* --- FIX POSISI & UKURAN KALENDER (SUPER FORCE) --- */
+    /* --- FIX POSISI & UKURAN KALENDER (PRESISI) --- */
     
-    /* 1. Paksa kontainer popover kalender pindah ke bawah kotak input */
+    /* 1. Atur wadah putih (popover) agar fit dengan kalender */
     div[data-baseweb="popover"] {
-        top: 60px !important; /* Geser manual ke bawah kotak input */
+        top: 60px !important; 
         bottom: auto !important;
-        transform: none !important; /* Hilangkan kalkulasi otomatis Streamlit */
+        transform: none !important;
+        /* Biar wadahnya gak kebesaran */
+        width: fit-content !important;
+        min-width: auto !important;
     }
 
-    /* 2. Hajar kontainer kalender agar mengecil (0.8 adalah ukuran paling aman) */
+    /* 2. Hajar kontainer kalender agar mengecil dan rapat */
     div[data-baseweb="calendar"] {
         transform: scale(0.8) !important;
         transform-origin: top left !important;
         background-color: #ffffff !important;
         border-radius: 8px !important;
-        box-shadow: 0 10px 10px rgba(0,0,0,0.1) !important;
+        /* Menghilangkan margin bawaan yang bikin wadah kelihatan besar */
+        margin: 0 !important; 
     }
 
-    /* 3. Rampingkan kotak input di sidebar */
+    /* 3. Menghilangkan padding sisa di pembungkus agar kotak putihnya pas */
+    div[data-baseweb="popover"] > div {
+        width: fit-content !important;
+        height: fit-content !important;
+        padding: 0 !important; /* Hapus ruang kosong di pinggiran */
+    }
+
+    /* 4. Rampingkan kotak input di sidebar */
     div[data-testid="stDateInput"] {
-        max-width: 100% !important;
+        max-width: 90% !important;
         margin: 0 auto !important;
     }
 

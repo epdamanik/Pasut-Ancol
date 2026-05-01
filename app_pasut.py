@@ -22,6 +22,12 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
 
+    /* --- SOLUSI KALENDER KE ATAS --- */
+    div[data-testid="stDateInput"] div[role="presentation"] {
+        top: 100% !important;
+        bottom: auto !important;
+    }
+
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
@@ -60,7 +66,6 @@ st.markdown("""
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
-
 # --- 2. LOGIC WAKTU ---
 tz_jkt = pytz.timezone('Asia/Jakarta')
 sekarang = datetime.now(tz_jkt)

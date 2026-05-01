@@ -56,7 +56,7 @@ st.markdown("""
         background-color: #f8fafc; border: 1px solid #e2e8f0; 
         text-align: center;
     }
-    .dev-name { color: #475569; font-weight: 400; font-size: 0.72rem; margin-top: 2px; display: block; }
+    .dev-name { color: #475569; font-weight: 400; font-size: 0.72rem; margin-top: 4px; display: block; }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -200,8 +200,8 @@ if df_pred is not None and not df_pred.empty:
                         line=dict(color=color, width=3.5, shape='spline'),
                     ))
 
-        # --- REVISI FINAL GARIS SEKARANG + ATRIBUT TEKS ---
-        y_max_axis = df_plot[col_val].max() + 0.5
+        # --- GARIS SEKARANG (FIXED VALUE ERROR) ---
+        y_max_axis = df_plot[col_val].max() + 0.3
         y_min_axis = df_plot[col_val].min() - 0.2
 
         fig.add_trace(go.Scatter(
@@ -210,18 +210,18 @@ if df_pred is not None and not df_pred.empty:
             mode="lines+text",
             name="Waktu Sekarang",
             line=dict(color="#22c55e", width=2, dash="dash"),
-            text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], # Teks cuma di titik atas
+            text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"],
             textposition="top center",
-            textfont=dict(color="#166534", size=11, font_variant="small-caps"),
+            textfont=dict(color="#166534", size=12), # Properti small-caps dihapus biar gak error
             showlegend=False
         ))
         
-        # Threshold (Hapus teks di add_hline biar gak TypeError, pake hline biasa)
+        # Threshold
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444")
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c")
         
         fig.update_layout(
-            height=500, template="plotly_white", margin=dict(l=10, r=10, t=25, b=10), 
+            height=500, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), 
             hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             yaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)', title="Tinggi Air (m)", autorange=True),
             xaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)')

@@ -47,46 +47,50 @@ def run_scraper():
     try:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         
-        # --- AWS ---
+        # --- AWS (SUDAH AMAN) ---
         try:
             print("\n--- Scraping AWS ---")
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "waterlevel")))
-            time.sleep(3)
+            time.sleep(2)
             val = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
             res["aws"] = val
             print(f"✅ AWS: {val} m")
         except Exception as e: print(f"❌ AWS Gagal: {e}")
             
-        # --- BPBD (PASAR IKAN) ---
+        # --- BPBD (PASAR IKAN) - JURUS BARU ---
         try:
-            print("\n--- Scraping BPBD ---")
+            print("\n--- Scraping BPBD (Metode Deep Scan) ---")
             driver.get("https://poskobanjir.dsdadki.web.id/")
+            time.sleep(10) # Kasih waktu lebih lama buat tabel beneran muncul
             
-            # Tunggu baris Pasar Ikan muncul
-            xpath_row = "//td[contains(text(), 'Pasar Ikan')]/.."
-            row_el = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath_row)))
+            # Kita cari SEMUA elemen yang mengandung kata 'Pasar Ikan'
+            # Lalu kita cari elemen angka di sekitarnya yang punya ID spesifik dari BPBD
+            # Berdasarkan input lu: cell10_4_ASPxLabel1_10
             
-            # Ambil semua text di baris itu tanpa peduli kolom
-            full_text = row_el.get_attribute("innerText")
-            print(f"Full Row Text: {full_text}")
+            try:
+                # Target langsung ke ID yang lu kasih (tapi pake filter partial karena ID sering berubah dikit)
+                tma_el = driver.find_element(By.XPATH, "//*[contains(@id, 'cell10_4_ASPxLabel1')]")
+                raw_val = tma_el.text.strip()
+                print(f"Target ID Found! Raw: {raw_val}")
+            except:
+                # Kalau gagal, cari manual angka yang paling masuk akal (3 digit) di seluruh page
+                print("ID tidak ketemu, scanning seluruh tabel...")
+                all_spans = driver.find_elements(By.TAG_NAME, "span")
+                raw_val = ""
+                for s in all_spans:
+                    txt = s.text.strip()
+                    if txt.isdigit() and 100 <= int(txt) <= 350:
+                        raw_val = txt
+                        print(f"Potential TMA found in span: {raw_val}")
+                        break
             
-            # Cari angka 3 digit (100-299) yang biasanya merupakan TMA (cm)
-            # Kita cari angka yang diikuti spasi atau karakter non-huruf
-            all_numbers = re.findall(r"(\d{3})", full_text)
-            
-            if all_numbers:
-                # Ambil angka pertama yang ditemukan (biasanya itu TMA-nya)
-                tma_cm = float(all_numbers[0])
+            if raw_val:
+                tma_cm = float(raw_val)
                 res["bpbd"] = tma_cm / 100.0
-                print(f"✅ BPBD Berhasil: {res['bpbd']} m (dari {tma_cm} cm)")
+                print(f"✅ BPBD Berhasil: {res['bpbd']} m")
             else:
-                # Jika tidak ada 3 digit, cari angka apapun yang masuk akal
-                match = re.search(r"(\d+)", full_text.replace("Pasar Ikan", "").replace("11", ""))
-                if match:
-                    tma_cm = float(match.group(1))
-                    res["bpbd"] = tma_cm / 100.0
-                    print(f"✅ BPBD Berhasil (Alt): {res['bpbd']} m")
+                print("❌ BPBD Tetap Gagal nemu angka.")
 
         except Exception as e: print(f"❌ BPBD Gagal: {e}")
             

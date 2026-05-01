@@ -1,8 +1,7 @@
 name: Auto Scraper TMA Priok
 
 on:
-  # Kita hapus cron bawaan karena sering ngaret (jam karet)
-  # Sekarang pemicu utamanya adalah API dari Google Apps Script
+  # Pemicu utama via API Google Apps Script atau tombol manual
   workflow_dispatch:
 
 permissions:
@@ -12,7 +11,6 @@ jobs:
   scrape-data:
     runs-on: ubuntu-latest
     
-    # Menghilangkan warning Node.js agar log lebih bersih
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     
@@ -36,8 +34,15 @@ jobs:
         run: |
           git config --global user.name "Bot-Stamar-Priok"
           git config --global user.email "bot@github.com"
-          # Menambahkan file CSV hasil scraping
+          
+          # Pakai wildcard *.csv agar semua file history terdeteksi
           git add history_aws_priok.csv history_bpbd_pasarikan.csv
-          # Commit hanya jika ada perubahan data, [skip ci] agar tidak trigger loop
-          git commit -m "Auto-update data TMA [skip ci]" || exit 0
-          git push
+          
+          # Cek status file untuk log
+          git status
+          
+          # Commit hanya jika ada perubahan. Jika tidak ada, tidak akan error (exit 0)
+          git commit -m "Auto-update data TMA: $(date +'%Y-%m-%d %H:%M') [skip ci]" || echo "Tidak ada perubahan data untuk di-commit"
+          
+          # Push hasil ke repository
+          git push origin main

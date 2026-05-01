@@ -93,7 +93,7 @@ with st.sidebar:
         with col_img:
             st.image(NAMA_FILE_LOGO, use_container_width=True)
     
-    st.markdown("<h3 style='text-align: center; color: #1e3a8a; margin-top: -10px; font-size: 1.1rem;'>BMKG MARITIM</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #1e3a8a; margin-top: -10px; font-size: 1.1rem;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</h3>", unsafe_allow_html=True)
     st.divider()
     
     st.subheader("🗓️ Filter Grafik")
@@ -107,11 +107,8 @@ with st.sidebar:
 st.markdown(f"""
     <div class="header-text">
         <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.55rem; line-height: 1.2;">
-            STASIUN METEOROLOGI MARITIM TANJUNG PRIOK
-        </h2>
-        <p style="color: #1e40af; font-weight: 700; margin-top: 4px; font-size: 1rem; letter-spacing: 0.5px;">
-            Monitoring Tinggi Muka Air (TMA) Real-Time
-        </p>
+            MONITORING TINGGI MUKA AIR (TMA) REAL TIME
+       
     </div>
     """, unsafe_allow_html=True)
 

@@ -22,10 +22,21 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; }
     
-    /* Perbaikan agar tulisan alert (Waspada/Awas) jelas di HP */
+    /* Perbaikan agar tulisan alert jelas & Ubah Background Waspada ke Orange */
+    [data-testid="stAlert"] {
+        border-radius: 10px !important;
+    }
+    
+    /* Maksa background st.warning jadi Orange */
+    div[data-testid="stNotificationContentWarning"] {
+        background-color: #ff9800 !important;
+        color: #000000 !important;
+    }
+
     [data-testid="stAlert"] * {
         color: #0f172a !important; 
         font-size: 1.1rem !important;
+        font-weight: 700 !important;
     }
     
     [data-testid="stMetricLabel"] { opacity: 1 !important; color: #1e3a8a !important; font-weight: 700 !important; }
@@ -202,10 +213,10 @@ if df_pred is not None and not df_pred.empty:
         dh_b = dh_b[(dh_b['waktu'] >= t_start) & (dh_b['waktu'] <= t_end) & (dh_b['nilai'] <= LIMIT_SENSOR_ERROR)].sort_values('waktu')
         fig.add_trace(go.Scatter(x=dh_b['waktu'], y=dh_b['nilai'], name='BPBD (History)', mode='lines+markers', line=dict(color='#f59e0b', width=3)))
 
-    # Garis vertikal waktu saat ini (KEMBALI KE ASLI)
+    # Garis vertikal waktu saat ini
     fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="green")
     
-    # Tambahin Teks Anotasi manual (KEMBALI KE ASLI)
+    # Tambahin Teks Anotasi manual
     teks_waktu = f"<b>Saat Ini ({sekarang.strftime('%d %b, %H:%M')} WIB)</b>"
     fig.add_annotation(
         x=sekarang,

@@ -22,16 +22,22 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
 
-    /* Menjinakkan Logo: Kecil & Pasti Rata Tengah */
+    /* --- FIX LOGO CENTER TOTAL --- */
+    /* Targetkan semua container gambar di sidebar agar rata tengah */
     [data-testid="stSidebar"] [data-testid="stImage"] {
-        display: flex !important;
-        justify-content: center !important; /* Tarik ke tengah secara horizontal */
+        text-align: center !important;
+        display: block !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        width: 100% !important;
     }
 
+    /* Targetkan tag img-nya langsung */
     [data-testid="stSidebar"] [data-testid="stImage"] img {
-        max-width: 85px !important; /* Ukuran pas buat HP & Desktop */
-        width: 100% !important;
-        height: auto !important;
+        max-width: 90px !important; /* Ukuran pas buat logo */
+        margin-left: auto !important;
+        margin-right: auto !important;
+        display: inline-block !important;
     }
 
     /* --- FIX POSISI & UKURAN KALENDER (PRESISI) --- */

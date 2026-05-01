@@ -64,36 +64,40 @@ def run_scraper():
             print("\n--- Memulai Scraping BPBD ---")
             driver.get("https://poskobanjir.dsdadki.web.id/")
             
-            # Cari baris Pasar Ikan
+            # Tunggu tabel render
             xpath_pasar_ikan = "//td[contains(text(), 'Pasar Ikan')]/.."
             row_el = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath_pasar_ikan)))
             
-            # Langsung tembak kolom ke-4 (Index 4) di dalam baris tersebut
-            # Kita ambil span di dalamnya jika ada
             cells = row_el.find_elements(By.TAG_NAME, "td")
+            val_tma = None
             
-            # Kita coba ambil teks dari kolom 4 dan kolom 5 (cadangan)
-            target_cols = [4, 5, 3] # Urutan prioritas kolom
-            for idx in target_cols:
-                if len(cells) > idx:
-                    raw_text = cells[idx].get_attribute("innerText")
-                    print(f"Cek Kolom [{idx}]: '{raw_text}'")
+            print("Mencari kolom yang berisi angka murni TMA...")
+            for idx, cell in enumerate(cells):
+                txt = cell.get_attribute("innerText").strip()
+                if not txt: continue
+                
+                # LOGIKA BARU: Cek apakah teks ini MURNI ANGKA (boleh ada minus)
+                # Ini akan mengabaikan "Pompa Pasar Ikan 1" karena ada hurufnya
+                if re.fullmatch(r"(-?\d+)", txt):
+                    num = float(txt)
                     
-                    # Cari angka dalam teks tersebut
-                    match = re.search(r"(-?\d+)", raw_text)
-                    if match:
-                        num = float(match.group(1))
-                        # Jika angka ratusan (cm), kita konversi. Jika satuan (m), biarkan.
-                        if abs(num) > 10:
-                            final_val = num / 100.0
-                        else:
-                            final_val = num
-                            
-                        # Validasi: TMA Pasar Ikan normalnya 1.0m - 2.5m (100-250cm)
-                        if 0.1 < abs(final_val) < LIMIT_SENSOR_ERROR:
-                            res["bpbd"] = final_val
-                            print(f"✅ Kolom [{idx}] valid sebagai TMA: {final_val} m")
+                    # Filter: TMA biasanya ratusan (cm) tapi bukan nomor urut (idx 0/1)
+                    if idx > 1:
+                        # Kita utamakan angka yang masuk akal sebagai TMA (misal 100-300 cm)
+                        if 50 < num < 500:
+                            val_tma = num / 100.0
+                            print(f"✅ TMA ditemukan di Kolom [{idx}]: {val_tma} m (Asli: {num})")
+                            res["bpbd"] = val_tma
                             break
+                        # Cadangan kalau web pakai satuan meter (misal 1.75)
+                        elif 0.1 < num < LIMIT_SENSOR_ERROR:
+                            val_tma = num
+                            print(f"✅ TMA ditemukan di Kolom [{idx}]: {val_tma} m")
+                            res["bpbd"] = val_tma
+                            break
+
+            if res["bpbd"] is None:
+                print("❌ Masih gagal nemu angka TMA yang bersih.")
 
         except Exception as e: print(f"❌ Gagal BPBD: {e}")
             

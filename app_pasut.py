@@ -100,7 +100,7 @@ with st.sidebar:
     tgl_range = st.date_input("Rentang Waktu", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     
     st.divider()
-    st.info("Data Prediksi ditarik dari Excel. Data History disuplai otomatis tiap 15 menit.")
+    st.info("Prediksi pasut dihitung menggunakan metode Analisis Harmonik dengan referensi data historis TMA Pasar Ikan tahun 2025.")
     st.caption("© 2026 Stasiun Meteorologi Maritim Tanjung Priok")
 
 # --- 4. HEADER UTAMA (Posisi Diperbaiki) ---
@@ -188,7 +188,7 @@ if df_pred is not None and not df_pred.empty:
     if abs(selisih) < 0.05: tren_status = "↔️ STAGNAN"
     elif selisih > 0: tren_status = "📈 NAIK"
     else: tren_status = "📉 TURUN"
-    m4.metric("Tren (3j Kedepan)", tren_status)
+    m4.metric("Tren (2j Kedepan)", tren_status)
 
     # --- PLOTLY CHART ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())

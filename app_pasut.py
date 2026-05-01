@@ -200,28 +200,28 @@ if df_pred is not None and not df_pred.empty:
                         line=dict(color=color, width=3.5, shape='spline'),
                     ))
 
-        # --- LOGIKA BARU GARIS SEKARANG (ANTI-CRASH) ---
-        # Kita pakai Scatter dengan y minimal ke maksimal untuk bikin garis vertikal manual
-        y_min_val = df_plot[col_val].min() if not df_plot.empty else 0
-        y_max_val = 3.0 # Angka aman di atas AWAS
-        
+        # --- REVISI FINAL GARIS SEKARANG + ATRIBUT TEKS ---
+        y_max_axis = df_plot[col_val].max() + 0.5
+        y_min_axis = df_plot[col_val].min() - 0.2
+
         fig.add_trace(go.Scatter(
             x=[sekarang_naive, sekarang_naive],
-            y=[y_min_val, y_max_val],
+            y=[y_min_axis, y_max_axis],
             mode="lines+text",
             name="Waktu Sekarang",
             line=dict(color="#22c55e", width=2, dash="dash"),
-            text=[f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}", ""],
-            textposition="top left",
+            text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], # Teks cuma di titik atas
+            textposition="top center",
+            textfont=dict(color="#166534", size=11, font_variant="small-caps"),
             showlegend=False
         ))
         
-        # Threshold (Tetap pakai add_hline karena biasanya stabil kalau gak pake annotation aneh-aneh)
+        # Threshold (Hapus teks di add_hline biar gak TypeError, pake hline biasa)
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444")
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c")
         
         fig.update_layout(
-            height=500, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10), 
+            height=500, template="plotly_white", margin=dict(l=10, r=10, t=25, b=10), 
             hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             yaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)', title="Tinggi Air (m)", autorange=True),
             xaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)')

@@ -35,9 +35,9 @@ st.markdown("""
         margin: 0 auto !important;
     }
 
-    /* 3. Mengecilkan ukuran panel kalender saat diklik (Skala 90%) */
+    /* 3. Mengecilkan ukuran panel kalender saat diklik (Skala 70%) */
     div[role="presentation"] div[data-baseweb="calendar"] {
-        transform: scale(0.9) !important;
+        transform: scale(0.7) !important;
         transform-origin: top center !important;
     }
 

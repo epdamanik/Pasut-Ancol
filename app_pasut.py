@@ -228,7 +228,7 @@ if df_pred is not None and not df_pred.empty:
     with f1:
         if os.path.exists(FILE_HISTORY_AWS): st.download_button("📥 Unduh Data AWS", open(FILE_HISTORY_AWS, 'rb'), "aws_priok.csv", "text/csv", use_container_width=True)
     with f2:
-        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Unduh Data Scrape Pompa Pasar Ikan I", open(FILE_HISTORY_BPBD, 'rb'), "bpbd_pasarikan.csv", "text/csv", use_container_width=True)
+        if os.path.exists(FILE_HISTORY_BPBD): st.download_button("📥 Unduh Data Scrape Pompa Pasar Ikan I", open(FILE_HISTORY_BPBD, 'rb'), "pasarikan.csv", "text/csv", use_container_width=True)
     with f3: 
         if st.button("🔄 Segarkan Data", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:

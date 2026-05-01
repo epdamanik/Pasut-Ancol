@@ -18,6 +18,7 @@ LIMIT_SENSOR_ERROR = 3.5
 
 def save_to_csv(filename, waktu, nilai):
     if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
+    # Bulatkan ke interval 15 menit terdekat
     menit_bulat = (waktu.minute // 15) * 15
     waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
     waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
@@ -40,7 +41,7 @@ def run_scraper():
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    # Biar gak diblokir, kita nyamar jadi browser beneran
+    # User-agent agar tidak diblokir server
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
     driver = None
@@ -49,88 +50,102 @@ def run_scraper():
     try:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         
-        # --- SCRAPING AWS ---
+        # --- SCRAPING AWS BMKG ---
         try:
-            print("Mencoba scraping AWS...")
-            # Pake timeout biar gak nunggu kelamaan kalau web down
+            print("\n--- Memulai Scraping AWS ---")
             driver.set_page_load_timeout(30) 
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             
-            # Tunggu sampe ID waterlevel beneran muncul angkanya
             el = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "waterlevel")))
-            time.sleep(3) # Jeda dikit biar JS-nya kelar narik angka
+            time.sleep(3) # Jeda render JavaScript
             
             val_text = el.text.strip()
-            print(f"Text AWS terdeteksi: {val_text}")
+            print(f"Raw Text AWS: {val_text}")
             
             match = re.search(r"(\d+[\.,]?\d*)", val_text)
             if match:
                 val = float(match.group(1).replace(',', '.'))
-                if val <= LIMIT_SENSOR_ERROR: res["aws"] = val
+                if val <= LIMIT_SENSOR_ERROR: 
+                    res["aws"] = val
+                    print(f"Hasil AWS: {val} m")
         except Exception as e: 
             print(f"Gagal narik AWS: {e}")
             
-        # --- SCRAPING BPBD ---
+        # --- SCRAPING BPBD (POSKO BANJIR) ---
         try:
-            print("Mencoba scraping BPBD...")
+            print("\n--- Memulai Scraping BPBD ---")
             driver.get("https://poskobanjir.dsdadki.web.id/")
             
-            # Tunggu sampe tabel beneran muncul
+            # Cari baris yang mengandung teks "Pasar Ikan"
             xpath_pasar_ikan = "//td[contains(text(), 'Pasar Ikan')]/.."
             row_el = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath_pasar_ikan)))
             
-            # Ambil semua cell (td) di baris Pasar Ikan
+            # Ambil semua kolom (td) dalam baris tersebut
             cells = row_el.find_elements(By.TAG_NAME, "td")
             
-            # Biasanya Tinggi Air ada di kolom ke-4 atau ke-5
-            # Kita cari angka yang paling masuk akal (biasanya 3-4 digit dalam cm)
             val_tma = None
-            for cell in cells:
-                txt = cell.text.strip()
-                # Cari angka yang berdiri sendiri dan bukan nomor urut (No: 11)
-                # Kita cari angka yang nilainya biasanya antara -500 sampai 4000 (cm)
-                if txt.isdigit():
-                    temp_val = float(txt)
-                    # Jika angka > 50 (biar gak ambil No urut atau status siaga)
-                    if temp_val > 50: 
-                        val_tma = temp_val
-                        break
+            print("Mengecek data di setiap kolom...")
             
-            if val_tma is not None:
-                val = val_tma / 100.0 # Convert cm ke meter
-                print(f"Dapet TMA Pasar Ikan: {val}m (dari {val_tma}cm)")
-                if val <= LIMIT_SENSOR_ERROR: 
-                    res["bpbd"] = val
-            else:
-                print("Gagal nemu angka TMA yang valid di baris Pasar Ikan")
+            for idx, cell in enumerate(cells):
+                txt = cell.text.strip()
+                if not txt: continue
+                
+                # Ekstrak angka (mendukung desimal dan negatif)
+                match_num = re.search(r"(-?\d+[\.,]?\d*)", txt)
+                
+                if match_num:
+                    raw_val = match_num.group(1).replace(',', '.')
+                    temp_val = float(raw_val)
+                    print(f"Kolom [{idx}] terdeteksi angka: {temp_val}")
+                    
+                    # Logika Filter:
+                    # Abaikan kolom 0 & 1 (biasanya No urut '11')
+                    if idx > 1:
+                        # Jika angka ribuan/ratusan (satuan CM)
+                        if abs(temp_val) > 50:
+                            val_tma = temp_val / 100.0
+                        # Jika angka satuan (sudah dalam Meter)
+                        elif -5.0 < temp_val < 5.0:
+                            val_tma = temp_val
+                        
+                        if val_tma is not None:
+                            print(f"✅ Kolom [{idx}] dikonfirmasi sebagai TMA: {val_tma} m")
+                            res["bpbd"] = val_tma
+                            break
+                            
+            if res["bpbd"] is None:
+                print("Gagal menemukan angka TMA yang valid di baris Pasar Ikan")
 
         except Exception as e: 
             print(f"Gagal narik BPBD: {e}")
             
     except Exception as e:
-        print(f"Driver Error: {e}")
+        print(f"Driver Error Utama: {e}")
     finally:
         if driver: driver.quit()
         
     return res
 
 if __name__ == "__main__":
+    # Setup Waktu Jakarta
     tz_jkt = pytz.timezone('Asia/Jakarta')
     sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
     
-    print(f"Memulai eksekusi background scraping pada {sekarang} WIB...")
+    print(f"\nEksekusi pada: {sekarang.strftime('%Y-%m-%d %H:%M:%S')} WIB")
     live_data = run_scraper()
     
+    # Simpan Hasil AWS
     if live_data["aws"] is not None:
         save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-        print(f"SUCCESS -> AWS tersimpan: {live_data['aws']}m")
+        print(f"SUCCESS -> AWS tersimpan: {live_data['aws']} m")
     else:
-        print("AWS Data Is None - Tidak Simpan ke CSV")
+        print("AWS Data Is None - Lewati penyimpanan CSV")
         
+    # Simpan Hasil BPBD (dengan logic mundur 15 menit jika diperlukan)
     if live_data["bpbd"] is not None:
-        # Mundur 15 menit buat BPBD sesuai request lu
-        waktu_bpbd_mundur = sekarang - timedelta(minutes=15)
-        save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd_mundur, live_data["bpbd"])
-        print(f"SUCCESS -> BPBD tersimpan: {live_data['bpbd']}m")
+        # Jika lu mau data BPBD dicatat pada slot 15 menit sebelumnya:
+        waktu_bpbd = sekarang - timedelta(minutes=15)
+        save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd, live_data["bpbd"])
+        print(f"SUCCESS -> BPBD tersimpan: {live_data['bpbd']} m")
     else:
-        print("BPBD Data Is None - Tidak Simpan ke CSV")
+        print("BPBD Data Is None - Lewati penyimpanan CSV")

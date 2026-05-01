@@ -2,19 +2,18 @@ name: Auto Scraper TMA Priok
 
 on:
   schedule:
-    - cron: '*/15 * * * *' 
+    - cron: '*/15 * * * *'
   workflow_dispatch: 
 
+# Kasih semua izin biar gak ada alasan 'Permission Denied'
 permissions:
   contents: write
-  actions: write # INI KUNCINYA: Biar gak ditolak pas push
+  actions: write
+  workflows: write
 
 jobs:
   scrape-data:
     runs-on: ubuntu-latest
-    
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     
     steps:
       - name: Checkout repo
@@ -34,16 +33,20 @@ jobs:
       - name: Eksekusi Background Scraper
         run: python scraper_khusus.py 
 
-      - name: Commit dan Push Hasil CSV ke Repo
+      - name: Push Hasil Secara Paksa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "Bot-Stamar-Priok"
           git config --global user.email "bot@github.com"
           
-          # Tambahkan file CSV
+          # Ambil perubahan terbaru biar gak tabrakan
+          git fetch origin main
+          
           git add history_aws_priok.csv history_bpbd_pasarikan.csv
           
-          # Commit jika ada perubahan
+          # Commit kalau ada perubahan, kalau gak ada langsung skip
           git commit -m "Auto-update data TMA [skip ci]" || exit 0
           
-          # GUNAKAN GITHUB_TOKEN Bawaan biar tembus permission
+          # Push pake token akses biar tembus blokir permission
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main --force

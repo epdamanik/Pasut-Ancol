@@ -132,7 +132,7 @@ if df_pred is not None and not df_pred.empty:
 
     # Metrics
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Prediksi Pasut dari data TMA psr. ikan 2025", f"{h_now:.2f} m")
+    m1.metric("Prediksi Pasut (TMA psr. ikan 2025)", f"{h_now:.2f} m")
     m2.metric("TMA AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws'] - h_now):+.2f} m dr prediksi" if live_data['aws'] else None, delta_color="inverse")
     m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
     

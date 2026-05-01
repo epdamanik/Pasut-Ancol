@@ -22,6 +22,13 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
 
+    /* Menjinakkan Logo agar tidak raksasa di HP */
+    [data-testid="stSidebar"] [data-testid="stImage"] img {
+        max-width: 80px !important; /* Sesuaikan angka ini, 80px-100px biasanya pas buat HP */
+        margin-left: auto;
+        margin-right: auto;
+    }
+
     /* --- FIX POSISI & UKURAN KALENDER (PRESISI) --- */
     
     /* 1. Atur wadah putih (popover) agar fit dengan kalender */
@@ -107,11 +114,10 @@ NAMA_FILE_LOGO = "logo-bmkg-transparan.png"
 
 with st.sidebar:
     if os.path.exists(NAMA_FILE_LOGO):
-        _, col_img, _ = st.columns([0.38, 0.24, 0.38])
-        with col_img:
-            st.image(NAMA_FILE_LOGO, use_container_width=True)
+        # Pakai st.image langsung tanpa kolom tambahan agar CSS max-width di atas bekerja maksimal
+        st.image(NAMA_FILE_LOGO)
     
-    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -3px; font-size: 1rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -10px; font-size: 0.85rem; font-weight: bold;'>STAMAR TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
     tgl_range = st.date_input("🗓️ Rentang Waktu Grafik", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))

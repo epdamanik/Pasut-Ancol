@@ -13,12 +13,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 # --- KONFIGURASI ---
+# Menggunakan nama file Ancol sesuai audit lokal
 FILE_HISTORY_AWS = 'history_aws_ancol.csv'
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
 LIMIT_SENSOR_ERROR = 3.5
 
 def save_to_csv(filename, waktu, nilai):
-    """Menyimpan data ke CSV dengan proteksi duplikat dan spasi liar."""
+    """Menyimpan data ke CSV dengan proteksi duplikat dan pembersihan spasi."""
     if nilai is None or nilai > LIMIT_SENSOR_ERROR:
         return
         
@@ -32,10 +33,13 @@ def save_to_csv(filename, waktu, nilai):
     try:
         if not os.path.exists(filename):
             new_data.to_csv(filename, index=False)
+            print(f"File baru dibuat: {filename}")
         else:
             old_data = pd.read_csv(filename)
+            # Bersihkan spasi gaib agar Git tidak bingung
             old_data['waktu'] = old_data['waktu'].astype(str).str.strip()
             
+            # Gabungkan, hapus duplikat jam yang sama, urutkan
             combined = pd.concat([old_data, new_data])
             combined = combined.drop_duplicates(subset=['waktu'], keep='last').sort_values('waktu')
             combined.to_csv(filename, index=False)
@@ -54,17 +58,17 @@ def run_scraper():
     try:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         
-        # --- 1. SCRAPING AWS BMKG ---
+        # --- 1. SCRAPING AWS BMKG (ANCOL/PRIOK) ---
         try:
             print("Mencoba scraping AWS...")
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
-            el = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "waterlevel")))
+            el = WebDriverWait(driver, 25).until(EC.presence_of_element_located((By.ID, "waterlevel")))
             match = re.search(r"(\d+[\.,]?\d*)", el.text)
             if match:
                 val = float(match.group(1).replace(',', '.'))
                 if val <= LIMIT_SENSOR_ERROR:
                     res["aws"] = val
-                    print(f"Dapat data AWS: {val}m")
+                    print(f"SUCCESS -> AWS dapet: {val}m")
         except Exception as e: 
             print(f"Gagal narik AWS: {e}")
             
@@ -72,8 +76,8 @@ def run_scraper():
         try:
             print("Mencoba scraping BPBD...")
             driver.get("https://poskobanjir.dsdadki.web.id/")
-            
-            wait = WebDriverWait(driver, 30)
+            wait = WebDriverWait(driver, 35)
+            # Cari baris yang mengandung 'Pasar Ikan'
             row_el = wait.until(EC.presence_of_element_located(
                 (By.XPATH, "//tr[td[contains(., 'Pasar Ikan')]]")
             ))
@@ -81,23 +85,18 @@ def run_scraper():
             row_text = row_el.text.strip()
             print(f"DEBUG: Baris ketemu -> {row_text}")
             
-            # PERBAIKAN REGEX: Cari angka yang didahului teks 'Tinggi Air'
-            # Kita cari kata 'Tinggi Air', abaikan karakter setelahnya sampai ketemu angka
+            # Cari angka yang hanya ada setelah kata 'Tinggi Air'
             match = re.search(r"Tinggi Air.*?(\d+)", row_text)
             
             if match:
                 raw_val = float(match.group(1))
-                
-                # Sesuai debug: "Tinggi Air (cm) : 165" -> raw_val = 165
-                # Kita bagi 100 karena satuannya cm di log
+                # Konversi CM ke M (165cm -> 1.65m)
                 val = raw_val / 100
-                    
                 if 0.0 < val <= LIMIT_SENSOR_ERROR:
                     res["bpbd"] = val
-                    print(f"SUCCESS -> BPBD dapet: {val}m (dari raw: {raw_val}cm)")
+                    print(f"SUCCESS -> BPBD dapet: {val}m (Raw: {raw_val}cm)")
             else:
-                print("Gagal menemukan angka Tinggi Air di teks BPBD")
-                
+                print("FAILED -> Angka Tinggi Air tidak ditemukan")
         except Exception as e: 
             print(f"Gagal narik BPBD: {e}")
             
@@ -106,7 +105,6 @@ def run_scraper():
     finally:
         if driver:
             driver.quit()
-        
     return res
 
 if __name__ == "__main__":
@@ -119,12 +117,12 @@ if __name__ == "__main__":
     
     if live_data["aws"] is not None:
         save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-        print(f"LOG: File AWS diperbarui: {live_data['aws']}m")
+        print(f"LOG: File AWS diperbarui.")
     
     if live_data["bpbd"] is not None:
         save_to_csv(FILE_HISTORY_BPBD, sekarang, live_data["bpbd"])
-        print(f"LOG: File BPBD diperbarui: {live_data['bpbd']}m")
+        print(f"LOG: File BPBD diperbarui.")
     else:
-        print("LOG: Data BPBD kosong, tidak ada yang disimpan.")
+        print("LOG: Data BPBD kosong.")
 
     print("=== Eksekusi Selesai ===")

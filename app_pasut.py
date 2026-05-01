@@ -25,13 +25,13 @@ st.markdown("""
     /* --- FIX POSISI & UKURAN KALENDER --- */
     /* 1. Paksa kalender terbuka ke bawah */
     div[data-testid="stDateInput"] div[role="presentation"] {
-        top: auto !important;
+        top: 50% !important;
         bottom: auto !important;
     }
     
     /* 2. Mengecilkan lebar kotak input di sidebar */
     div[data-testid="stDateInput"] {
-        max-width: 90% !important; 
+        max-width: 70% !important; 
         margin: 0 auto !important;
     }
 

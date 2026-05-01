@@ -18,10 +18,23 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    .block-container { padding-top: 2.2rem !important; padding-bottom: 0rem !important; max-width: 95% !important; }
+    /* Container Utama */
+    .block-container { 
+        padding-top: 2.2rem !important; 
+        padding-bottom: 0rem !important; 
+        max-width: 95% !important; 
+    }
     .stApp { background-color: #ffffff; }
-    .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
+    
+    /* Header Utama */
+    .header-text { 
+        text-align: center; 
+        width: 100%; 
+        margin-top: -25px; 
+        margin-bottom: 15px; 
+    }
 
+    /* Kotak Metrik Simetris & Animasi Hover */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
@@ -39,11 +52,14 @@ st.markdown("""
         transform: translateY(-5px) !important;
         box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1) !important;
         border-color: #1e40af !important;
+        background-color: #fcfdfe !important;
     }
 
+    /* Font Metrics */
     [data-testid="stMetricLabel"] { color: #1e3a8a !important; font-weight: 700 !important; font-size: 0.85rem !important; }
     [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 800 !important; color: #0f172a !important; }
 
+    /* Summary Bar */
     .summary-box {
         background-color: #f1f5f9 !important; padding: 10px !important; 
         border-radius: 10px !important; margin-bottom: 15px !important; 
@@ -51,12 +67,14 @@ st.markdown("""
     }
     .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
 
+    /* Footer Sidebar */
     .footer-card {
         margin-top: 50px; padding: 12px; border-radius: 10px; 
         background-color: #f8fafc; border: 1px solid #e2e8f0; 
         text-align: center;
     }
     .dev-name { color: #475569; font-weight: 400; font-size: 0.72rem; margin-top: 2px; display: block; }
+    
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -173,27 +191,22 @@ if df_pred is not None and not df_pred.empty:
     icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")
     m4.metric("Tren (3j Kedepan)", f"{icon} {status}")
 
-    # --- PLOTLY CHART (ESTETIKA RENOVATION) ---
+    # --- PLOTLY CHART ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
-        # 1. Garis Prediksi (Dibuat Spline/Meliuk + Shadow Area)
+        # Garis Prediksi (Murni Garis Spline tanpa Fill)
         fig.add_trace(go.Scatter(
             x=df_plot[col_tgl], y=df_plot[col_val], 
             name='Prediksi', 
             mode='lines',
-            line=dict(color='rgba(148, 163, 184, 0.5)', dash='dot', width=2, shape='spline'),
-            fill='tozeroy', 
-            fillcolor='rgba(226, 232, 240, 0.3)' # Efek Shadow Area Lembut
+            line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline'),
         ))
         
-        # 2. History Data (Smoothing 'spline' & Warna Solid)
-        for file, label, color, fill_color in [
-            (FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed', 'rgba(124, 58, 237, 0.1)'), 
-            (FILE_HISTORY_BPBD, 'BPBD (Hist)', '#f59e0b', 'rgba(245, 158, 11, 0.1)')
-        ]:
+        # History Data (Garis Solid Meliuk)
+        for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'BPBD (Hist)', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
                 dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
@@ -204,11 +217,10 @@ if df_pred is not None and not df_pred.empty:
                         name=label, 
                         connectgaps=True, 
                         mode='lines',
-                        line=dict(color=color, width=3.5, shape='spline'), # SHAPE SPLINE biar gak kaku
-                        fill='tonexty' if label == 'BPBD (Hist)' else None, # Optional shadow
+                        line=dict(color=color, width=3.5, shape='spline'),
                     ))
 
-        # Annotations (Threshold)
+        # Thresholds
         fig.add_vline(x=sekarang, line_width=2, line_dash="dash", line_color="#22c55e")
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS", annotation_position="top right")
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="WASPADA", annotation_position="top right")
@@ -219,18 +231,23 @@ if df_pred is not None and not df_pred.empty:
             margin=dict(l=10, r=10, t=10, b=10), 
             hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            # Bikin Grid lebih halus
-            xaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)'),
-            yaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)', title="Tinggi Air (m)")
+            yaxis=dict(
+                showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)', 
+                title="Tinggi Air (m)",
+                autorange=True, # Dinamis, tidak harus mulai dari 0
+                fixedrange=False
+            ),
+            xaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)')
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("Pilih rentang waktu pada filter di sidebar untuk menampilkan grafik.")
 
+    # Footer Buttons
     st.divider()
     c1, c2, c3 = st.columns(3)
-    with c1: st.download_button("📥 AWS CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "aws.csv", use_container_width=True)
-    with c2: st.download_button("📥 BPBD CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "bpbd.csv", use_container_width=True)
+    with c1: st.download_button("📥 Scrape AWS Maritim Tj. Priok CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "aws.csv", use_container_width=True)
+    with c2: st.download_button("📥 Scrape Pasar Ikan CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "Pasarikan.csv", use_container_width=True)
     with c3: 
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:

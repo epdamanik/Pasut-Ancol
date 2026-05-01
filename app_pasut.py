@@ -81,16 +81,21 @@ with st.sidebar:
     tgl_range = st.date_input("🗓️ Rentang Waktu Grafik", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     st.link_button("🌐 Web BMKG Tanjung Priok", "https://bmkgtanjungpriok.info/", use_container_width=True)
     
-    st.divider()
     with st.expander("ℹ️ Info Sumber Data"):
         st.markdown("""
-        **📍 Prediksi:**
-        Analisis Harmonik data TMA Pasar Ikan I (DSDA) Tahun 2025.
-        
-        **⚡ Real-time:**
-        * AWS Stamar Tanjung Priok (BMKG).
-        * Pintu Air Pasar Ikan I (DSDA).
-        """)
+        <div style="text-align: justify; font-size: 0.85rem; color: #475569;">
+            <strong>📍 Prediksi:</strong><br>
+            Analisis Harmonik data TMA Pasar Ikan I (DSDA) Tahun 2025.
+        </div>
+        <br>
+        <div style="text-align: justify; font-size: 0.85rem; color: #475569;">
+            <strong>⚡ Real-time:</strong>
+            <ul style="margin-top: 5px; padding-left: 20px;">
+                <li>AWS Stamar Tanjung Priok (BMKG).</li>
+                <li>Pintu Air Pasar Ikan I (DSDA).</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown(f"""
         <div class="footer-card">

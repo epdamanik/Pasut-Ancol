@@ -2,8 +2,8 @@ name: Auto Scraper TMA Priok
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # Gue balikin biar otomatis jalan tiap 15 menit
-  workflow_dispatch: # Lu tetep bisa klik manual dari Apps Script atau GitHub
+    - cron: '*/15 * * * *' # Jalan otomatis tiap 15 menit
+  workflow_dispatch: # Bisa di-trigger manual
 
 permissions:
   contents: write
@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Ambil history lengkap biar gak error pas push
+          fetch-depth: 0 # Penting: ambil semua history
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -38,11 +38,12 @@ jobs:
           git config --global user.name "Bot-Stamar-Priok"
           git config --global user.email "bot@github.com"
           
-          # Tambahkan file secara spesifik
+          # Daftarkan file CSV-nya
           git add history_aws_priok.csv history_bpbd_pasarikan.csv
           
-          # Commit jika ada perubahan, kalau gak ada ya exit santai
+          # Commit jika ada perubahan data, exit 0 jika tidak ada perubahan
           git commit -m "Auto-update data TMA [skip ci]" || exit 0
           
-          # OBATNYA DI SINI: Sebutkan origin dan branch-nya secara jelas
-          git push origin main
+          # PAKSA PUSH (Force Push)
+          # Ini solusi terakhir buat ngatasi error 'rejected (fetch first)'
+          git push origin main --force

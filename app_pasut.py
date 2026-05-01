@@ -80,7 +80,7 @@ with st.sidebar:
         with col_img:
             st.image(NAMA_FILE_LOGO, use_container_width=True)
     
-    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -10px; font-size: 0.95rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -8px; font-size: 0.95rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
     tgl_range = st.date_input("🗓️ Rentang Waktu Grafik", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))

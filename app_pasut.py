@@ -145,9 +145,9 @@ if df_pred is not None and not df_pred.empty:
     if abs(selisih) < threshold:
         tren_status = "↔️ STAGNAN"
     elif selisih > 0:
-        tren_status = "📈 PASANG"
+        tren_status = "📈 LEVEL AIR NAIK"
     else:
-        tren_status = "📉 SURUT"
+        tren_status = "📉 LEVEL AIR TURUN"
     
     m4.metric("Tren", tren_status)
 

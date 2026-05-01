@@ -133,13 +133,16 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     
+   # Footer - Dipisah biar lebih estetik
     st.markdown(f"""
         <div class="footer-card">
-            <p style='font-size: 0.7rem; color: #1e3a8a; margin-bottom: 0;'>© 2026 Stamar Tanjung Priok</p>
-            <p style='font-size: 0.6rem; color: #64748b; margin-top: 4px;'>
-                Developed by <br>
-                <span class="dev-name">E.P. Damanik</span>
+            <p style='font-size: 0.72rem; color: #1e3a8a; margin-bottom: 0; font-weight: 600;'>
+                © 2026 Stamar Tanjung Priok
             </p>
+        </div>
+        <div style="text-align: center; margin-top: 15px;">
+            <p style='font-size: 0.6rem; color: #94a3b8; margin-bottom: 0;'>Developed by</p>
+            <span style="color: #64748b; font-weight: 500; font-size: 0.7rem;">E.P. Damanik</span>
         </div>
     """, unsafe_allow_html=True)
 

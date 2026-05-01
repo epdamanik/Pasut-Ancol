@@ -5,21 +5,15 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch: 
 
-# Kasih semua izin biar gak ada alasan 'Permission Denied'
 permissions:
   contents: write
-  actions: write
-  workflows: write
 
 jobs:
   scrape-data:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -30,23 +24,13 @@ jobs:
         run: |
           pip install selenium webdriver-manager pandas pytz openpyxl
 
-      - name: Eksekusi Background Scraper
+      - name: Run Scraper
         run: python scraper_khusus.py 
 
-      - name: Push Hasil Secara Paksa
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit and Push
         run: |
           git config --global user.name "Bot-Stamar-Priok"
           git config --global user.email "bot@github.com"
-          
-          # Ambil perubahan terbaru biar gak tabrakan
-          git fetch origin main
-          
           git add history_aws_priok.csv history_bpbd_pasarikan.csv
-          
-          # Commit kalau ada perubahan, kalau gak ada langsung skip
-          git commit -m "Auto-update data TMA [skip ci]" || exit 0
-          
-          # Push pake token akses biar tembus blokir permission
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main --force
+          git commit -m "Update data TMA [skip ci]" || exit 0
+          git push origin main

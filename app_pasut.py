@@ -22,11 +22,16 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
 
-    /* Menjinakkan Logo agar tidak raksasa di HP */
+    /* Menjinakkan Logo: Kecil & Pasti Rata Tengah */
+    [data-testid="stSidebar"] [data-testid="stImage"] {
+        display: flex !important;
+        justify-content: center !important; /* Tarik ke tengah secara horizontal */
+    }
+
     [data-testid="stSidebar"] [data-testid="stImage"] img {
-        max-width: 80px !important; /* Sesuaikan angka ini, 80px-100px biasanya pas buat HP */
-        margin-left: auto;
-        margin-right: auto;
+        max-width: 85px !important; /* Ukuran pas buat HP & Desktop */
+        width: 100% !important;
+        height: auto !important;
     }
 
     /* --- FIX POSISI & UKURAN KALENDER (PRESISI) --- */

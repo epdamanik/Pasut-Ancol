@@ -137,10 +137,10 @@ if df_pred is not None and not df_pred.empty:
     m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd'] - h_now):+.2f} m dr prediksi" if live_data['bpbd'] else None, delta_color="inverse")
     
     # --- LOGIKA TREN (2 Jam ke Depan + Stagnan) ---
-    waktu_target = sekarang + timedelta(hours=2)
+    waktu_target = sekarang + timedelta(hours=3)
     h_next = df_pred.loc[(df_pred[col_tgl] - waktu_target).abs().idxmin(), col_val]
     selisih = h_next - h_now
-    threshold = 0.02 # Threshold 2 cm
+    threshold = 0.05 # Threshold 5 cm
 
     if abs(selisih) < threshold:
         tren_status = "↔️ STAGNAN"

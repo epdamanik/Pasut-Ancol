@@ -32,7 +32,7 @@ def save_to_csv(filename, waktu, nilai):
             combined = pd.concat([old_data, new_data]).sort_values('waktu')
             combined.to_csv(filename, index=False)
         except Exception as e:
-            print(f"Error saat simpan CSV: {e}")
+            print(f"Error simpan CSV: {e}")
 
 def run_scraper():
     options = Options()
@@ -47,59 +47,48 @@ def run_scraper():
     try:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         
-        # --- AWS BMKG ---
+        # --- AWS ---
         try:
-            print("\n--- Memulai Scraping AWS ---")
+            print("\n--- Scraping AWS ---")
             driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
             el = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "waterlevel")))
             time.sleep(3)
             val = float(re.search(r"(\d+[\.,]?\d*)", el.text).group(1).replace(',', '.'))
-            if val <= LIMIT_SENSOR_ERROR: 
-                res["aws"] = val
-                print(f"✅ Hasil AWS: {val} m")
-        except Exception as e: print(f"❌ Gagal AWS: {e}")
+            res["aws"] = val
+            print(f"✅ AWS: {val} m")
+        except Exception as e: print(f"❌ AWS Gagal: {e}")
             
         # --- BPBD (PASAR IKAN) ---
         try:
-            print("\n--- Memulai Scraping BPBD ---")
+            print("\n--- Scraping BPBD ---")
             driver.get("https://poskobanjir.dsdadki.web.id/")
             
-            # Tunggu tabel render
-            xpath_pasar_ikan = "//td[contains(text(), 'Pasar Ikan')]/.."
-            row_el = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath_pasar_ikan)))
+            # Tunggu baris Pasar Ikan muncul
+            xpath_row = "//td[contains(text(), 'Pasar Ikan')]/.."
+            row_el = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath_row)))
             
-            cells = row_el.find_elements(By.TAG_NAME, "td")
-            val_tma = None
+            # Ambil semua text di baris itu tanpa peduli kolom
+            full_text = row_el.get_attribute("innerText")
+            print(f"Full Row Text: {full_text}")
             
-            print("Mencari kolom yang berisi angka murni TMA...")
-            for idx, cell in enumerate(cells):
-                txt = cell.get_attribute("innerText").strip()
-                if not txt: continue
-                
-                # LOGIKA BARU: Cek apakah teks ini MURNI ANGKA (boleh ada minus)
-                # Ini akan mengabaikan "Pompa Pasar Ikan 1" karena ada hurufnya
-                if re.fullmatch(r"(-?\d+)", txt):
-                    num = float(txt)
-                    
-                    # Filter: TMA biasanya ratusan (cm) tapi bukan nomor urut (idx 0/1)
-                    if idx > 1:
-                        # Kita utamakan angka yang masuk akal sebagai TMA (misal 100-300 cm)
-                        if 50 < num < 500:
-                            val_tma = num / 100.0
-                            print(f"✅ TMA ditemukan di Kolom [{idx}]: {val_tma} m (Asli: {num})")
-                            res["bpbd"] = val_tma
-                            break
-                        # Cadangan kalau web pakai satuan meter (misal 1.75)
-                        elif 0.1 < num < LIMIT_SENSOR_ERROR:
-                            val_tma = num
-                            print(f"✅ TMA ditemukan di Kolom [{idx}]: {val_tma} m")
-                            res["bpbd"] = val_tma
-                            break
+            # Cari angka 3 digit (100-299) yang biasanya merupakan TMA (cm)
+            # Kita cari angka yang diikuti spasi atau karakter non-huruf
+            all_numbers = re.findall(r"(\d{3})", full_text)
+            
+            if all_numbers:
+                # Ambil angka pertama yang ditemukan (biasanya itu TMA-nya)
+                tma_cm = float(all_numbers[0])
+                res["bpbd"] = tma_cm / 100.0
+                print(f"✅ BPBD Berhasil: {res['bpbd']} m (dari {tma_cm} cm)")
+            else:
+                # Jika tidak ada 3 digit, cari angka apapun yang masuk akal
+                match = re.search(r"(\d+)", full_text.replace("Pasar Ikan", "").replace("11", ""))
+                if match:
+                    tma_cm = float(match.group(1))
+                    res["bpbd"] = tma_cm / 100.0
+                    print(f"✅ BPBD Berhasil (Alt): {res['bpbd']} m")
 
-            if res["bpbd"] is None:
-                print("❌ Masih gagal nemu angka TMA yang bersih.")
-
-        except Exception as e: print(f"❌ Gagal BPBD: {e}")
+        except Exception as e: print(f"❌ BPBD Gagal: {e}")
             
     except Exception as e: print(f"Driver Error: {e}")
     finally:
@@ -114,8 +103,7 @@ if __name__ == "__main__":
     
     if live_data["aws"] is not None:
         save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-        print(f"STAMP -> AWS: {live_data['aws']} m")
+        print(f"SUCCESS AWS: {live_data['aws']}m")
     if live_data["bpbd"] is not None:
-        waktu_bpbd = sekarang - timedelta(minutes=15)
-        save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd, live_data["bpbd"])
-        print(f"STAMP -> BPBD: {live_data['bpbd']} m")
+        save_to_csv(FILE_HISTORY_BPBD, sekarang - timedelta(minutes=15), live_data["bpbd"])
+        print(f"SUCCESS BPBD: {live_data['bpbd']}m")

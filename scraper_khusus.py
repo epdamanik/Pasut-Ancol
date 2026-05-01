@@ -1,9 +1,4 @@
-import os
-import time
-import re
 import pandas as pd
-from datetime import datetime, timedelta
-import pytz
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -11,101 +6,64 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+import datetime
+import pytz
+import time
 
-# --- KONFIGURASI ---
-FILE_HISTORY_AWS = 'history_aws_priok.csv'
-FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
-LIMIT_SENSOR_ERROR = 3.5
+# Setup Browser
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-def save_to_csv(filename, waktu, nilai):
-    if nilai is None or nilai > LIMIT_SENSOR_ERROR: return
-    # Pembulatan 15 menit
-    menit_bulat = (waktu.minute // 15) * 15
-    waktu_fixed = waktu.replace(minute=menit_bulat, second=0, microsecond=0)
-    waktu_str = waktu_fixed.strftime('%Y-%m-%d %H:%M')
-    
-    new_data = pd.DataFrame({'waktu': [waktu_str], 'nilai': [nilai]})
-    
-    if not os.path.exists(filename):
-        new_data.to_csv(filename, index=False)
-    else:
-        try:
-            old_data = pd.read_csv(filename)
-            # Pastikan waktu jadi string
-            old_data['waktu'] = old_data['waktu'].astype(str)
-            # Hapus jika jamnya sama (hindari double)
-            old_data = old_data[old_data['waktu'] != waktu_str]
-            combined = pd.concat([old_data, new_data]).sort_values('waktu')
-            combined.to_csv(filename, index=False)
-        except Exception as e:
-            print(f"Error saat simpan CSV {filename}: {e}")
+wib = pytz.timezone('Asia/Jakarta')
+waktu_sekarang = datetime.datetime.now(wib).strftime('%Y-%m-%d %H:%M:%S')
 
-def run_scraper():
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    driver = None
-    res = {"aws": None, "bpbd": None}
-    
+def scrape_aws():
     try:
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        
-        # --- SCRAPING AWS ---
-        try:
-            print("Mencoba scraping AWS...")
-            driver.get("http://202.90.199.132/aws-new/monitoring/3000000009")
-            el = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, "waterlevel")))
-            match = re.search(r"(\d+[\.,]?\d*)", el.text)
-            if match:
-                val = float(match.group(1).replace(',', '.'))
-                if val <= LIMIT_SENSOR_ERROR: 
-                    res["aws"] = val
-                    print(f"Dapat AWS: {val}")
-        except Exception as e: 
-            print(f"Gagal narik AWS: {e}")
-            
-        # --- SCRAPING BPBD ---
-        try:
-            print("Mencoba scraping BPBD...")
-            driver.get("https://poskobanjir.dsdadki.web.id/")
-            # Pakai XPath yang paling dasar
-            row_el = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.XPATH, "//tr[contains(., 'Pasar Ikan')]"))
-            )
-            # Coba ambil onclick, kalau gagal ya sudah (AWS tetep jalan)
-            script_text = row_el.get_attribute("onclick")
-            if script_text:
-                match = re.search(r"ShowPopup\('[^']*',\s*'(\d+)'", script_text)
-                if match:
-                    val = float(match.group(1)) / 1000 
-                    if val <= LIMIT_SENSOR_ERROR: 
-                        res["bpbd"] = val
-                        print(f"Dapat BPBD: {val}")
-        except Exception as e: 
-            print(f"Gagal narik BPBD: {e}")
-            
+        print("Mencoba scraping AWS...")
+        driver.get("URL_WEB_AWS_LU") # Ganti pake URL AWS
+        time.sleep(5)
+        # MODE ONCLICK: Klik dulu baru ambil data
+        button = driver.find_element(By.XPATH, "//button[contains(@onclick, 'aws')]") # Sesuaikan onclick-nya
+        driver.execute_script("arguments[0].click();", button)
+        time.sleep(3)
+        nilai = driver.find_element(By.ID, "id_nilai_aws").text # Sesuaikan ID-nya
+        return nilai
     except Exception as e:
-        print(f"Driver Error Utama: {e}")
-    finally:
-        if driver: driver.quit()
-        
-    return res
+        print(f"Gagal AWS: {e}")
+        return None
 
-if __name__ == "__main__":
-    tz_jkt = pytz.timezone('Asia/Jakarta')
-    sekarang = datetime.now(tz_jkt).replace(tzinfo=None)
-    
-    print(f"Memulai eksekusi pada {sekarang} WIB...")
-    live_data = run_scraper()
-    
-    # Simpan AWS
-    if live_data["aws"] is not None:
-        save_to_csv(FILE_HISTORY_AWS, sekarang, live_data["aws"])
-        print(f"SUCCESS -> AWS tersimpan.")
-        
-    # Simpan BPBD
-    if live_data["bpbd"] is not None:
-        waktu_bpbd_mundur = sekarang - timedelta(minutes=15)
-        save_to_csv(FILE_HISTORY_BPBD, waktu_bpbd_mundur, live_data["bpbd"])
-        print(f"SUCCESS -> BPBD tersimpan.")
+def scrape_bpbd():
+    try:
+        print("Mencoba scraping Pasar Ikan (BPBD)...")
+        driver.get("https://bpbd.jakarta.go.id/waterlevel") # Contoh URL BPBD
+        time.sleep(5)
+        # MODE ONCLICK: Klik tombol Pasar Ikan
+        btn_pasar_ikan = driver.find_element(By.XPATH, "//*[contains(text(), 'Pasar Ikan')]")
+        driver.execute_script("arguments[0].click();", btn_pasar_ikan)
+        time.sleep(3)
+        nilai = driver.find_element(By.CLASS_NAME, "nilai-waterlevel").text # Sesuaikan
+        return nilai
+    except Exception as e:
+        print(f"Gagal BPBD: {e}")
+        return None
+
+# Eksekusi
+data_aws = scrape_aws()
+data_bpbd = scrape_bpbd()
+
+# SIMPAN AWS
+if data_aws:
+    df_aws = pd.DataFrame([{'waktu': waktu_sekarang, 'nilai': data_aws}])
+    df_aws.to_csv('history_aws_priok.csv', mode='a', header=False, index=False)
+    print(f"SUCCESS -> AWS {data_aws} tersimpan.")
+
+# SIMPAN PASAR IKAN (Gak bakal ketuker lagi)
+if data_bpbd:
+    df_bpbd = pd.DataFrame([{'waktu': waktu_sekarang, 'nilai': data_bpbd}])
+    df_bpbd.to_csv('history_bpbd_pasarikan.csv', mode='a', header=False, index=False)
+    print(f"SUCCESS -> Pasar Ikan {data_bpbd} tersimpan.")
+
+driver.quit()

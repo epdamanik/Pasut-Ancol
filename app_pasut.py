@@ -156,7 +156,7 @@ with st.sidebar:
         <div style="text-align: justify; font-size: 0.95rem; color: #475569;">
             <strong>⚡ Real-time:</strong>
             <ul style="margin-top: 5px; padding-left: 20px;">
-                <li>AWS Stamar Tanjung Priok (BMKG).</li>
+                <li>AWS Maritim Tanjung Priok (BMKG).</li>
                 <li>Pintu Air Pasar Ikan I (DSDA).</li>
             </ul>
         </div>

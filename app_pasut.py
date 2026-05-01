@@ -141,8 +141,8 @@ with st.sidebar:
             </p>
         </div>
         <div style="text-align: center; margin-top: 15px;">
-            <p style='font-size: 0.6rem; color: #94a3b8; margin-bottom: 0;'>Developed by</p>
-            <span style="color: #64748b; font-weight: 500; font-size: 0.7rem;">E.P. Damanik</span>
+            <p style='font-size: 0.5rem; color: #94a3b8; margin-bottom: 0;'>Developed by</p>
+            <span style="color: #64748b; font-weight: 500; font-size: 0.5rem;">E.P. Damanik</span>
         </div>
     """, unsafe_allow_html=True)
 

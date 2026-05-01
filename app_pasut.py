@@ -117,10 +117,10 @@ if df_pred is not None and not df_pred.empty:
     waspada = [n for n, v in check_values.items() if v is not None and 2.3 <= v < 2.5]
 
     if awas:
-        st.error(f"### 🚨 STATUS: AWAS ROB! ({', '.join(awas)})", icon="⚠️")
+        st.error(f"**🚨 STATUS: AWAS ROB! ({', '.join(awas)})**", icon="⚠️")
         play_audio("AWAS ROB.mp3") 
     elif waspada:
-        st.warning(f"### ⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
+        st.warning(f"**⚠️ STATUS: WASPADA ROB! ({', '.join(waspada)})**", icon="📢")
         play_audio("waspada ROB.mp3")
 
     # Summary Today

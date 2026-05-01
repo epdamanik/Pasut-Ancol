@@ -125,10 +125,22 @@ NAMA_FILE_LOGO = "logo-bmkg-transparan.png"
 
 with st.sidebar:
     if os.path.exists(NAMA_FILE_LOGO):
-        # Pakai st.image langsung tanpa kolom tambahan agar CSS max-width di atas bekerja maksimal
-        st.image(NAMA_FILE_LOGO)
+        # Trik Base64: Mengubah gambar jadi kode teks supaya bisa dipanggil via HTML murni
+        with open(NAMA_FILE_LOGO, "rb") as f:
+            data = f.read()
+            encoded = base64.b64encode(data).decode()
+        
+        # Paksa rata tengah pakai HTML murni (Pasti Berhasil!)
+        st.markdown(
+            f"""
+            <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: -15px; margin-bottom: 10px;">
+                <img src="data:image/png;base64,{encoded}" style="width: 85px; height: auto;">
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     
-    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -10px; font-size: 0.85rem; font-weight: bold;'>STAMAR TANJUNG PRIOK</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -5px; font-size: 0.85rem; font-weight: bold;'>STAMAR TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
     tgl_range = st.date_input("🗓️ Rentang Waktu Grafik", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))

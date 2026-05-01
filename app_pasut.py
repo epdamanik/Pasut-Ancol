@@ -18,19 +18,9 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    .block-container { 
-        padding-top: 2.2rem !important; 
-        padding-bottom: 0rem !important; 
-        max-width: 95% !important; 
-    }
+    .block-container { padding-top: 2.2rem !important; padding-bottom: 0rem !important; max-width: 95% !important; }
     .stApp { background-color: #ffffff; }
-    
-    .header-text { 
-        text-align: center; 
-        width: 100%; 
-        margin-top: -25px; 
-        margin-bottom: 15px; 
-    }
+    .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
 
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
@@ -67,15 +57,14 @@ st.markdown("""
         text-align: center;
     }
     .dev-name { color: #475569; font-weight: 400; font-size: 0.72rem; margin-top: 2px; display: block; }
-    
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. LOGIC WAKTU (FIX ZONA WAKTU) ---
+# --- 2. LOGIC WAKTU ---
 tz_jkt = pytz.timezone('Asia/Jakarta')
-# Pastikan waktu 'sekarang' benar-benar mengikuti zona WIB
 sekarang = datetime.now(tz_jkt)
+sekarang_naive = sekarang.replace(tzinfo=None)
 
 # --- 3. SIDEBAR ---
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
@@ -126,7 +115,6 @@ st.markdown(f"""
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
-LIMIT_SENSOR_ERROR = 3.5 
 
 def play_audio(file_path):
     if os.path.exists(file_path):
@@ -149,7 +137,6 @@ def load_prediction():
     t_col = next((c for c in ['tanggal_prediksi', 'Waktu_WIB', 'Waktu'] if c in df.columns), None)
     v_col = next((c for c in ['wl_prediksi', 'Tinggi_Navigasi_m'] if c in df.columns), None)
     if t_col: 
-        # Tetapkan zona waktu WIB pada data prediksi jika belum ada
         df[t_col] = pd.to_datetime(df[t_col], format='mixed', errors='coerce')
     return df.dropna(subset=[t_col, v_col]).sort_values(t_col), t_col, v_col
 
@@ -159,8 +146,6 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 
 # --- 7. DISPLAY ---
 if df_pred is not None and not df_pred.empty:
-    # Cari nilai prediksi terdekat dengan waktu sekarang (harus sama-sama naif atau sama-sama aware)
-    sekarang_naive = sekarang.replace(tzinfo=None)
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
     check = {"Prediksi": h_now, "AWS": live_data['aws'], "BPBD": live_data['bpbd']}
@@ -195,7 +180,6 @@ if df_pred is not None and not df_pred.empty:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
-        # Garis Prediksi
         fig.add_trace(go.Scatter(
             x=df_plot[col_tgl], y=df_plot[col_val], 
             name='Prediksi', 
@@ -203,7 +187,6 @@ if df_pred is not None and not df_pred.empty:
             line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline'),
         ))
         
-        # History Data
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'BPBD (Hist)', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
@@ -218,10 +201,9 @@ if df_pred is not None and not df_pred.empty:
                         line=dict(color=color, width=3.5, shape='spline'),
                     ))
 
-        # GARIS SEKARANG (WIB - TANGGAL, BULAN, JAM)
-        # Gunakan format ISO string agar Plotly tidak bingung zona waktu
+        # GARIS SEKARANG (FIXED TYPEERROR DENGAN ISO STRING)
         fig.add_vline(
-            x=sekarang_naive, 
+            x=sekarang_naive.strftime("%Y-%m-%d %H:%M:%S"), 
             line_width=2, 
             line_dash="dash", 
             line_color="#22c55e",

@@ -71,7 +71,7 @@ st.divider()
 # --- 5. DATA FUNCTIONS ---
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
-FILE_HISTORY_PSR_IKAN = 'history_bpbd_pasarikan.csv'
+FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
 LIMIT_SENSOR_ERROR = 3.5 
 
 def play_audio(file_path):

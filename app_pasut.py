@@ -162,16 +162,16 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     
-   # Footer - Dipisah biar lebih estetik
+   # Footer - Jarak dirapatkan
     st.markdown(f"""
         <div class="footer-card">
             <p style='font-size: 0.72rem; color: #1e3a8a; margin-bottom: 0; font-weight: 600;'>
                 © 2026 Stasiun Meteorologi Maritim Tanjung Priok
             </p>
         </div>
-        <div style="text-align: center; margin-top: 15px;">
-            <p style='font-size: 0.5rem; color: #94a3b8; margin-bottom: 0;'>Developed by</p>
-            <span style="color: #64748b; font-weight: 500; font-size: 0.5rem;">E.P. Damanik</span>
+        <div style="text-align: center; margin-top: 15px; line-height: 1;">
+            <p style='font-size: 0.5rem; color: #94a3b8; margin-bottom: 2px;'>Developed by</p>
+            <p style="color: #64748b; font-weight: 500; font-size: 0.5rem; margin: 0;">E.P. Damanik</p>
         </div>
     """, unsafe_allow_html=True)
 

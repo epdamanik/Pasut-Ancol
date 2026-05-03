@@ -221,7 +221,7 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
-    check = {"Prediksi": h_now, "AWS": live_data['aws'], "BPBD": live_data['bpbd']}
+    check = {"Prediksi": h_now, "AWS": live_data['aws'], "PASAR IKAN": live_data['bpbd']}
     awas = [n for n, v in check.items() if v and v >= 2.5]
     waspada = [n for n, v in check.items() if v and 2.3 <= v < 2.5]
 

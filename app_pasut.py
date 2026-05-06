@@ -7,7 +7,7 @@ from streamlit_autorefresh import st_autorefresh
 import os
 import base64
 
-# --- 0. SMART AUTO REFRESH (Sync tiap 15 Menit) ---
+# --- 0. SMART AUTO REFRESH ---
 now_sync = datetime.now()
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
 if seconds_to_next <= 0: seconds_to_next = 900
@@ -22,7 +22,7 @@ st.markdown("""
     .stApp { background-color: #ffffff; }
     .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
 
-    /* --- GAYA METRIK --- */
+    /* --- KOTAK METRIK (ULTRA SLIM) --- */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
@@ -40,16 +40,18 @@ st.markdown("""
         color: #1e3a8a !important; 
         font-weight: 700 !important; 
         font-size: 0.7rem !important; 
-        margin-bottom: -5px !important; 
+        margin-bottom: -10px !important; 
+        white-space: nowrap !important;
     }
 
     [data-testid="stMetricValue"] { 
-        font-size: 16px !important; 
+        font-size: 15px !important; 
         font-weight: 800 !important; 
         color: #0f172a !important; 
+        white-space: nowrap !important;
     }
 
-    /* Hilangkan delta bawaan */
+    /* Sembunyikan delta asli Streamlit */
     div[data-testid="stMetricDelta"] { display: none !important; }
 
     .summary-box {
@@ -122,37 +124,66 @@ if df_pred is not None and not df_pred.empty:
 
     m1, m2, m3, m4 = st.columns(4)
     
-    # 1. Prediksi
+    # 1. Prediksi (Kotak Tetap)
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
-    # Fungsi Helper buat Label Berwarna
-    def format_diff(val_real, val_pred):
+    # Fungsi format teks di dalam st.metric asli
+    def get_metric_text(val_real, val_pred):
         if val_real is None: return "N/A"
         diff = val_real - val_pred
-        color = "#22c55e" if diff >= 0 else "#ef4444" # Hijau jika di atas/sama, Merah jika di bawah
-        sign = "+" if diff >= 0 else "" # Plus manual, Minus sudah otomatis dari angka
-        return f'{val_real:.2f} m <span style="color: {color}; font-size: 14px;">({sign}{diff:.2f})</span>'
+        # Pakai karakter warna & simbol manual
+        color = "🟢" if diff >= 0 else "🔴"
+        sign = "+" if diff >= 0 else ""
+        # Karena kita mau font warna, tapi Streamlit metric value cuma terima string, 
+        # kita biarkan CSS yang handle atau pakai simbol warna.
+        return f"{val_real:.2f} m ({sign}{diff:.2f})"
 
-    # 2. AWS
-    m2.markdown(f"**AWS Tj. Priok**")
-    m2.markdown(format_diff(live_data['aws'], h_now), unsafe_allow_html=True)
+    # 2. AWS (Kembali ke st.metric)
+    val_aws = get_latest_from_csv(FILE_HISTORY_AWS)
+    diff_aws = (val_aws - h_now) if val_aws else 0
+    sign_aws = "+" if diff_aws >= 0 else ""
+    color_aws = "#22c55e" if diff_aws >= 0 else "#ef4444"
+    
+    m2.metric("AWS Tj. Priok", f"{val_aws:.2f} m")
+    # Trik: Gunakan markdown tepat di bawah label untuk menyuntikkan delta warna-warni di samping value
+    st.markdown(f"""
+        <style>
+        [data-testid="column"]:nth-child(2) [data-testid="stMetricValue"]::after {{
+            content: " ({sign_aws}{diff_aws:.2f})";
+            color: {color_aws};
+            font-size: 14px;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
 
-    # 3. Psr Ikan
-    m3.markdown(f"**TMA Psr. Ikan**")
-    m3.markdown(format_diff(live_data['bpbd'], h_now), unsafe_allow_html=True)
+    # 3. Psr Ikan (Kembali ke st.metric)
+    val_bpbd = get_latest_from_csv(FILE_HISTORY_BPBD)
+    diff_bpbd = (val_bpbd - h_now) if val_bpbd else 0
+    sign_bpbd = "+" if diff_bpbd >= 0 else ""
+    color_bpbd = "#22c55e" if diff_bpbd >= 0 else "#ef4444"
+    
+    m3.metric("TMA Psr. Ikan", f"{val_bpbd:.2f} m")
+    st.markdown(f"""
+        <style>
+        [data-testid="column"]:nth-child(3) [data-testid="stMetricValue"]::after {{
+            content: " ({sign_bpbd}{diff_bpbd:.2f})";
+            color: {color_bpbd};
+            font-size: 14px;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
     
     # 4. Tren
     h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
     icon = "📈 NAIK" if (h_next - h_now) > 0.05 else "📉 TURUN" if (h_next - h_now) < -0.05 else "↔️ STAGNAN"
     m4.metric("Tren (3j)", icon)
 
-    # --- PLOTLY ---
+    # --- PLOTLY CHART ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#94a3b8', dash='dot')))
     
-    # Tambahkan data histori jika ada
     for file, label, color in [(FILE_HISTORY_AWS, 'AWS', '#7c3aed'), (FILE_HISTORY_BPBD, 'Psr. Ikan', '#f59e0b')]:
         if os.path.exists(file):
             dh = pd.read_csv(file)
@@ -163,7 +194,7 @@ if df_pred is not None and not df_pred.empty:
     fig.update_layout(height=400, margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"))
     st.plotly_chart(fig, use_container_width=True)
 
-    # Download Buttons
+    # Tombol Aksi
     c1, c2, c3 = st.columns(3)
     c1.download_button("📥 AWS", open(FILE_HISTORY_AWS, 'rb').read() if os.path.exists(FILE_HISTORY_AWS) else b"", "AWS.csv", use_container_width=True)
     c2.download_button("📥 Psr Ikan", open(FILE_HISTORY_BPBD, 'rb').read() if os.path.exists(FILE_HISTORY_BPBD) else b"", "Pasarikan.csv", use_container_width=True)

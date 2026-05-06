@@ -18,27 +18,29 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    /* 1. Paksa container utama mentok ke atas layar */
+    /* 1. Merapatkan container utama ke atas layar */
     .block-container { 
         padding-top: 0.5rem !important; 
         padding-bottom: 0rem !important; 
         max-width: 95% !important; 
     }
 
-    /* 2. Hilangkan gap antar elemen vertikal bawaan Streamlit */
+    /* 2. Menghilangkan gap antar elemen vertikal bawaan Streamlit secara agresif */
     [data-testid="stVerticalBlock"] > div {
         gap: 0px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
     }
 
     .stApp { background-color: #ffffff; }
     
-    /* 3. Rapatkan Header Utama */
+    /* 3. Rapatkan Header Utama ke paling atas */
     .header-text { 
         text-align: center; 
         width: 100%; 
-        margin-top: -10px; /* Menarik teks ke atas */
-        margin-bottom: 0px; 
-        padding-bottom: 5px;
+        margin-top: -30px !important; /* Tarik header lebih tinggi */
+        margin-bottom: 0px !important; 
+        padding-bottom: 0px !important;
     }
 
     /* --- FIX LOGO CENTER TOTAL --- */
@@ -97,8 +99,8 @@ st.markdown("""
         background-color: #f1f5f9 !important; 
         padding: 8px !important; 
         border-radius: 10px !important; 
-        margin-top: -5px !important; /* Tarik summary box ke atas */
-        margin-bottom: 5px !important; 
+        margin-top: -15px !important; /* Tarik paksa ke atas pepet header */
+        margin-bottom: 10px !important; 
         border-left: 5px solid #1e3a8a !important; 
         text-align: center !important;
     }

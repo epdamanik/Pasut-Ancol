@@ -38,24 +38,7 @@ st.markdown("""
         display: inline-block !important;
     }
 
-    /* --- FIX POSISI & UKURAN KALENDER --- */
-    div[data-baseweb="popover"] {
-        top: 90px !important; 
-        bottom: auto !important;
-        transform: none !important;
-        width: fit-content !important;
-        min-width: auto !important;
-    }
-
-    div[data-baseweb="calendar"] {
-        transform: scale(1) !important;
-        transform-origin: top left !important;
-        background-color: #ffffff !important;
-        border-radius: 8px !important;
-        margin: 0 !important; 
-    }
-
-    /* --- GAYA METRIK (ULTRA SLIM VERSION) --- */
+    /* --- GAYA METRIK (ULTRA SLIM + HORIZONTAL VALUE) --- */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
@@ -78,15 +61,16 @@ st.markdown("""
     }
 
     [data-testid="stMetricValue"] { 
-        font-size: 17px !important; 
+        font-size: 15px !important; /* Ukuran pas untuk teks sampingan */
         font-weight: 800 !important; 
         color: #0f172a !important; 
+        white-space: nowrap !important;
     }
 
-    /* Merampingkan jarak antar kolom metrik */
-    div[data-testid="column"] {
-        padding: 0 5px !important;
-    }
+    /* Hilangkan panah delta bawaan jika masih ada */
+    div[data-testid="stMetricDelta"] { display: none !important; }
+
+    div[data-testid="column"] { padding: 0 5px !important; }
 
     .summary-box {
         background-color: #f1f5f9 !important; padding: 10px !important; 
@@ -217,7 +201,7 @@ if df_pred is not None and not df_pred.empty:
         st.warning(f"📢 STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
         play_audio("waspada ROB.mp3")
 
-    # --- SUMMARY BOX DENGAN JAM MAX/MIN ---
+    # --- SUMMARY BOX ---
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         idx_max = df_h[col_val].idxmax()
@@ -236,10 +220,27 @@ if df_pred is not None and not df_pred.empty:
         """, unsafe_allow_html=True)
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
-    m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m" if live_data["aws"] else "N/A", delta=f"{(live_data['aws']-h_now):+.2f}m" if live_data['aws'] else None, delta_color="inverse")
-    m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m" if live_data["bpbd"] else "N/A", delta=f"{(live_data['bpbd']-h_now):+.2f}m" if live_data["bpbd"] else None, delta_color="inverse")
     
+    # Kolom 1: Prediksi
+    m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
+    
+    # Kolom 2: AWS (Manual Delta Horizontal)
+    if live_data['aws']:
+        d_aws = live_data['aws'] - h_now
+        icon_aws = "🔺" if d_aws > 0 else "🔹"
+        m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m {icon_aws}({d_aws:+.2f})")
+    else:
+        m2.metric("AWS Tj. Priok", "N/A")
+
+    # Kolom 3: Psr. Ikan (Manual Delta Horizontal)
+    if live_data['bpbd']:
+        d_bpbd = live_data['bpbd'] - h_now
+        icon_bpbd = "🔺" if d_bpbd > 0 else "🔹"
+        m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m {icon_bpbd}({d_bpbd:+.2f})")
+    else:
+        m3.metric("TMA Psr. Ikan", "N/A")
+    
+    # Kolom 4: Tren
     h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
     selisih = h_next - h_now
     icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")

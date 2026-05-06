@@ -18,9 +18,11 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    .block-container { padding-top: 2.2rem !important; padding-bottom: 0rem !important; max-width: 95% !important; }
+    .block-container { padding-top: 1.5rem !important; padding-bottom: 0rem !important; max-width: 95% !important; }
     .stApp { background-color: #ffffff; }
-    .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
+    
+    /* --- HEADER (MEPET KE ATAS) --- */
+    .header-text { text-align: center; width: 100%; margin-top: -35px; margin-bottom: 5px; }
 
     /* --- KOTAK METRIK (ULTRA SLIM) --- */
     div[data-testid="stMetric"] {
@@ -30,7 +32,7 @@ st.markdown("""
         padding: 4px 10px !important; 
         border-radius: 8px !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
-        min-height: 55px !important; 
+        min-height: 50px !important; 
         display: flex !important;
         flex-direction: column !important;
         justify-content: center !important;
@@ -53,12 +55,16 @@ st.markdown("""
 
     div[data-testid="stMetricDelta"] { display: none !important; }
 
+    /* --- SUMMARY BOX (LEBIH TIPIS & MEPET) --- */
     .summary-box {
-        background-color: #f1f5f9 !important; padding: 10px !important; 
-        border-radius: 10px !important; margin-bottom: 15px !important; 
-        border-left: 5px solid #1e3a8a !important; text-align: center !important;
+        background-color: #f1f5f9 !important; 
+        padding: 6px !important; 
+        border-radius: 8px !important; 
+        margin-bottom: 10px !important; 
+        border-left: 5px solid #1e3a8a !important; 
+        text-align: center !important;
     }
-    .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
+    .summary-text { font-weight: 850 !important; font-size: 0.9rem !important; color: #0f172a !important; }
     
     footer {visibility: hidden;}
     </style>
@@ -173,7 +179,7 @@ if df_pred is not None and not df_pred.empty:
             dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end)]
             fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, line=dict(color=color, width=3)))
 
-    fig.update_layout(height=400, margin=dict(l=0,r=0,t=20,b=0), legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"))
+    fig.update_layout(height=400, margin=dict(l=0,r=0,t=15,b=0), legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"))
     st.plotly_chart(fig, use_container_width=True)
 
     # Tombol Aksi

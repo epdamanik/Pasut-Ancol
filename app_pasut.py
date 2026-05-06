@@ -170,6 +170,7 @@ if df_pred is not None and not df_pred.empty:
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)]
     fig = go.Figure()
+    
     fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', line=dict(color='#94a3b8', dash='dot')))
     
     for file, label, color in [(FILE_HISTORY_AWS, 'AWS', '#7c3aed'), (FILE_HISTORY_BPBD, 'Psr. Ikan', '#f59e0b')]:
@@ -178,6 +179,10 @@ if df_pred is not None and not df_pred.empty:
             dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
             dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end)]
             fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, line=dict(color=color, width=3)))
+
+    # --- BALIK KE ANGKA ASLI LO ---
+    fig.add_hline(y=2.3, line_dash="dash", line_color="#f97316", annotation_text="Waspada Rob (2.3m)", annotation_position="top left")
+    fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="Awas Rob (2.5m)", annotation_position="top left")
 
     fig.update_layout(height=400, margin=dict(l=0,r=0,t=15,b=0), legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"))
     st.plotly_chart(fig, use_container_width=True)

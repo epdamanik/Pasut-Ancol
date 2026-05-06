@@ -55,41 +55,37 @@ st.markdown("""
         margin: 0 !important; 
     }
 
-    div[data-baseweb="popover"] > div {
-        width: fit-content !important;
-        height: fit-content !important;
-        padding: 0 !important;
-    }
-
-    div[data-testid="stDateInput"] {
-        max-width: 90% !important;
-        margin: 0 auto !important;
-    }
-
-    /* --- GAYA METRIK (VERSI RAMPING / COMPACT) --- */
+    /* --- GAYA METRIK (ULTRA SLIM VERSION) --- */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
-        border-left: 5px solid #1e40af !important; 
-        padding: 8px 15px !important;
-        border-radius: 12px !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-        min-height: 90px !important; 
+        border-left: 4px solid #1e40af !important; 
+        padding: 4px 10px !important; 
+        border-radius: 8px !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+        min-height: 55px !important; 
         display: flex !important;
         flex-direction: column !important;
         justify-content: center !important;
-        transition: all 0.3s ease-in-out !important;
     }
+    
     div[data-testid="stMetricLabel"] { 
         color: #1e3a8a !important; 
         font-weight: 700 !important; 
-        font-size: 0.8rem !important; 
-        margin-bottom: -5px !important;
+        font-size: 0.7rem !important; 
+        margin-bottom: -10px !important; 
+        white-space: nowrap !important;
     }
+
     [data-testid="stMetricValue"] { 
-        font-size: 20px !important; 
+        font-size: 17px !important; 
         font-weight: 800 !important; 
         color: #0f172a !important; 
+    }
+
+    /* Merampingkan jarak antar kolom metrik */
+    div[data-testid="column"] {
+        padding: 0 5px !important;
     }
 
     .summary-box {
@@ -226,12 +222,8 @@ if df_pred is not None and not df_pred.empty:
     if not df_h.empty:
         idx_max = df_h[col_val].idxmax()
         idx_min = df_h[col_val].idxmin()
-        
-        v_max = df_h.loc[idx_max, col_val]
-        t_max = df_h.loc[idx_max, col_tgl].strftime("%H:%M")
-        
-        v_min = df_h.loc[idx_min, col_val]
-        t_min = df_h.loc[idx_min, col_tgl].strftime("%H:%M")
+        v_max, t_max = df_h.loc[idx_max, col_val], df_h.loc[idx_max, col_tgl].strftime("%H:%M")
+        v_min, t_min = df_h.loc[idx_min, col_val], df_h.loc[idx_min, col_tgl].strftime("%H:%M")
 
         st.markdown(f"""
             <div class="summary-box">
@@ -251,7 +243,7 @@ if df_pred is not None and not df_pred.empty:
     h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
     selisih = h_next - h_now
     icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")
-    m4.metric("Tren (3 jam Kedepan)", f"{icon} {status}")
+    m4.metric("Tren (3j Kedepan)", f"{icon} {status}")
 
     # --- PLOTLY CHART ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
@@ -259,33 +251,14 @@ if df_pred is not None and not df_pred.empty:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
-        fig.add_trace(go.Scatter(
-            x=df_plot[col_tgl], y=df_plot[col_val], 
-            name='Prediksi', mode='lines',
-            line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline'),
-        ))
+        fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', mode='lines', line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline')))
         
         unique_days = df_plot[col_tgl].dt.date.unique()
         for day in unique_days:
             df_day = df_plot[df_plot[col_tgl].dt.date == day]
-            idx_max_p = df_day[col_val].idxmax()
-            idx_min_p = df_day[col_val].idxmin()
-            
-            fig.add_trace(go.Scatter(
-                x=[df_day.loc[idx_max_p, col_tgl]], y=[df_day.loc[idx_max_p, col_val]],
-                mode='markers+text', name=f'Max {day}',
-                marker=dict(color='#ef4444', size=8, symbol='circle'),
-                text=[f"{df_day.loc[idx_max_p, col_val]:.2f}"],
-                textposition="top center", showlegend=False
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=[df_day.loc[idx_min_p, col_tgl]], y=[df_day.loc[idx_min_p, col_val]],
-                mode='markers+text', name=f'Min {day}',
-                marker=dict(color='#3b82f6', size=8, symbol='circle'),
-                text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"],
-                textposition="bottom center", showlegend=False
-            ))
+            idx_max_p, idx_min_p = df_day[col_val].idxmax(), df_day[col_val].idxmin()
+            fig.add_trace(go.Scatter(x=[df_day.loc[idx_max_p, col_tgl]], y=[df_day.loc[idx_max_p, col_val]], mode='markers+text', marker=dict(color='#ef4444', size=8), text=[f"{df_day.loc[idx_max_p, col_val]:.2f}"], textposition="top center", showlegend=False))
+            fig.add_trace(go.Scatter(x=[df_day.loc[idx_min_p, col_tgl]], y=[df_day.loc[idx_min_p, col_val]], mode='markers+text', marker=dict(color='#3b82f6', size=8), text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"], textposition="bottom center", showlegend=False))
 
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'Psr. Ikan (Hist)', '#f59e0b')]:
             if os.path.exists(file):
@@ -293,44 +266,20 @@ if df_pred is not None and not df_pred.empty:
                 dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
                 dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end)].sort_values('waktu')
                 if not dh.empty:
-                    fig.add_trace(go.Scatter(
-                        x=dh['waktu'], y=dh['nilai'], 
-                        name=label, connectgaps=True, mode='lines',
-                        line=dict(color=color, width=3.5, shape='spline'),
-                    ))
+                    fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, mode='lines', line=dict(color=color, width=3.5, shape='spline')))
 
-        y_max_axis = df_plot[col_val].max() + 0.3
-        y_min_axis = df_plot[col_val].min() - 0.2
-
-        fig.add_trace(go.Scatter(
-            x=[sekarang_naive, sekarang_naive],
-            y=[y_min_axis, y_max_axis],
-            mode="lines+text",
-            name="Waktu Sekarang",
-            line=dict(color="#22c55e", width=2, dash="dash"),
-            text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"],
-            textposition="top center",
-            textfont=dict(color="#166534", size=12),
-            showlegend=False
-        ))
-        
+        y_max_axis, y_min_axis = df_plot[col_val].max() + 0.3, df_plot[col_val].min() - 0.2
+        fig.add_trace(go.Scatter(x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis], mode="lines+text", line=dict(color="#22c55e", width=2, dash="dash"), text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], textposition="top center", showlegend=False))
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444")
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c")
         
-        fig.update_layout(
-            height=500, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), 
-            hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            yaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)', title="Tinggi Air (m)", autorange=True),
-            xaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='rgba(235, 235, 235, 0.8)')
-        )
+        fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("Pilih rentang waktu pada filter di sidebar untuk menampilkan grafik.")
 
     st.divider()
     c1, c2, c3 = st.columns(3)
-    with c1: st.download_button("📥 Scrape AWS Maritim Tj. Priok CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "AWS.csv", use_container_width=True)
-    with c2: st.download_button("📥 Scrape Pintu air Pasar Ikan I CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "Pasarikan.csv", use_container_width=True)
+    with c1: st.download_button("📥 AWS CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "AWS.csv", use_container_width=True)
+    with c2: st.download_button("📥 Psr. Ikan CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "Pasarikan.csv", use_container_width=True)
     with c3: 
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:

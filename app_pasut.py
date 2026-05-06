@@ -51,7 +51,6 @@ st.markdown("""
         white-space: nowrap !important;
     }
 
-    /* Sembunyikan delta asli Streamlit */
     div[data-testid="stMetricDelta"] { display: none !important; }
 
     .summary-box {
@@ -115,63 +114,46 @@ st.markdown('<div class="header-text"><h2 style="margin: 0; font-weight: bold; f
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
-    # Summary Box
+    # Summary Box dengan Jam MAX/MIN
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
-        v_max = df_h[col_val].max()
-        v_min = df_h[col_val].min()
-        st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {v_max:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {v_min:.2f}m</span></span></div>', unsafe_allow_html=True)
+        idx_max = df_h[col_val].idxmax()
+        idx_min = df_h[col_val].idxmin()
+        v_max, t_max = df_h.loc[idx_max, col_val], df_h.loc[idx_max, col_tgl].strftime("%H:%M")
+        v_min, t_min = df_h.loc[idx_min, col_val], df_h.loc[idx_min, col_tgl].strftime("%H:%M")
+
+        st.markdown(f"""
+            <div class="summary-box">
+                <span class="summary-text">
+                    📅 {sekarang.strftime("%d %b %Y")} | 
+                    <span style="color: #ef4444;">▲ MAX: {v_max:.2f}m ({t_max})</span> | 
+                    <span style="color: #3b82f6;">▼ MIN: {v_min:.2f}m ({t_min})</span>
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
 
     m1, m2, m3, m4 = st.columns(4)
     
-    # 1. Prediksi (Kotak Tetap)
+    # 1. Prediksi
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
-    # Fungsi format teks di dalam st.metric asli
-    def get_metric_text(val_real, val_pred):
-        if val_real is None: return "N/A"
-        diff = val_real - val_pred
-        # Pakai karakter warna & simbol manual
-        color = "🟢" if diff >= 0 else "🔴"
-        sign = "+" if diff >= 0 else ""
-        # Karena kita mau font warna, tapi Streamlit metric value cuma terima string, 
-        # kita biarkan CSS yang handle atau pakai simbol warna.
-        return f"{val_real:.2f} m ({sign}{diff:.2f})"
-
-    # 2. AWS (Kembali ke st.metric)
+    # 2. AWS
     val_aws = get_latest_from_csv(FILE_HISTORY_AWS)
-    diff_aws = (val_aws - h_now) if val_aws else 0
+    diff_aws = (val_aws - h_now) if val_aws is not None else 0
     sign_aws = "+" if diff_aws >= 0 else ""
     color_aws = "#22c55e" if diff_aws >= 0 else "#ef4444"
     
-    m2.metric("AWS Tj. Priok", f"{val_aws:.2f} m")
-    # Trik: Gunakan markdown tepat di bawah label untuk menyuntikkan delta warna-warni di samping value
-    st.markdown(f"""
-        <style>
-        [data-testid="column"]:nth-child(2) [data-testid="stMetricValue"]::after {{
-            content: " ({sign_aws}{diff_aws:.2f})";
-            color: {color_aws};
-            font-size: 14px;
-        }}
-        </style>
-    """, unsafe_allow_html=True)
+    m2.metric("AWS Tj. Priok", f"{val_aws:.2f} m" if val_aws is not None else "N/A")
+    st.markdown(f'<style>[data-testid="column"]:nth-child(2) [data-testid="stMetricValue"]::after {{ content: " ({sign_aws}{diff_aws:.2f})"; color: {color_aws}; font-size: 14px; }}</style>', unsafe_allow_html=True)
 
-    # 3. Psr Ikan (Kembali ke st.metric)
+    # 3. Psr Ikan
     val_bpbd = get_latest_from_csv(FILE_HISTORY_BPBD)
-    diff_bpbd = (val_bpbd - h_now) if val_bpbd else 0
+    diff_bpbd = (val_bpbd - h_now) if val_bpbd is not None else 0
     sign_bpbd = "+" if diff_bpbd >= 0 else ""
     color_bpbd = "#22c55e" if diff_bpbd >= 0 else "#ef4444"
     
-    m3.metric("TMA Psr. Ikan", f"{val_bpbd:.2f} m")
-    st.markdown(f"""
-        <style>
-        [data-testid="column"]:nth-child(3) [data-testid="stMetricValue"]::after {{
-            content: " ({sign_bpbd}{diff_bpbd:.2f})";
-            color: {color_bpbd};
-            font-size: 14px;
-        }}
-        </style>
-    """, unsafe_allow_html=True)
+    m3.metric("TMA Psr. Ikan", f"{val_bpbd:.2f} m" if val_bpbd is not None else "N/A")
+    st.markdown(f'<style>[data-testid="column"]:nth-child(3) [data-testid="stMetricValue"]::after {{ content: " ({sign_bpbd}{diff_bpbd:.2f})"; color: {color_bpbd}; font-size: 14px; }}</style>', unsafe_allow_html=True)
     
     # 4. Tren
     h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]

@@ -337,5 +337,3 @@ if df_pred is not None and not df_pred.empty:
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:
     st.error("Gagal memuat data prediksi.")
-2 tulisan 📅 07 May 2026 | ▲ MAX: 2.25m (00:00) | ▼ MIN: 1.53m (12:00), lengkapi jam untuk masing masing max dan min nya, terus kotaknya di pepetin ke headr utama,
-kasih gw script full jnya

@@ -23,7 +23,6 @@ st.markdown("""
     .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
 
     /* --- FIX LOGO CENTER TOTAL --- */
-    /* Targetkan semua container gambar di sidebar agar rata tengah */
     [data-testid="stSidebar"] [data-testid="stImage"] {
         text-align: center !important;
         display: block !important;
@@ -32,71 +31,71 @@ st.markdown("""
         width: 100% !important;
     }
 
-    /* Targetkan tag img-nya langsung */
     [data-testid="stSidebar"] [data-testid="stImage"] img {
-        max-width: 90px !important; /* Ukuran pas buat logo */
+        max-width: 90px !important;
         margin-left: auto !important;
         margin-right: auto !important;
         display: inline-block !important;
     }
 
-    /* --- FIX POSISI & UKURAN KALENDER (PRESISI) --- */
-    
-    /* 1. Atur wadah putih (popover) agar fit dengan kalender */
+    /* --- FIX POSISI & UKURAN KALENDER --- */
     div[data-baseweb="popover"] {
         top: 90px !important; 
         bottom: auto !important;
         transform: none !important;
-        /* Biar wadahnya gak kebesaran */
         width: fit-content !important;
         min-width: auto !important;
     }
 
-    /* 2. Hajar kontainer kalender agar mengecil dan rapat */
     div[data-baseweb="calendar"] {
         transform: scale(1) !important;
         transform-origin: top left !important;
         background-color: #ffffff !important;
         border-radius: 8px !important;
-        /* Menghilangkan margin bawaan yang bikin wadah kelihatan besar */
         margin: 0 !important; 
     }
 
-    /* 3. Menghilangkan padding sisa di pembungkus agar kotak putihnya pas */
     div[data-baseweb="popover"] > div {
         width: fit-content !important;
         height: fit-content !important;
-        padding: 0 !important; /* Hapus ruang kosong di pinggiran */
+        padding: 0 !important;
     }
 
-    /* 4. Rampingkan kotak input di sidebar */
     div[data-testid="stDateInput"] {
         max-width: 90% !important;
         margin: 0 auto !important;
     }
 
-    /* --- GAYA METRIK & FOOTER --- */
+    /* --- GAYA METRIK (VERSI RAMPING / COMPACT) --- */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
         border-left: 5px solid #1e40af !important; 
-        padding: 15px !important; 
+        padding: 8px 15px !important; /* Diperkecil */
         border-radius: 12px !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-        min-height: 125px !important; 
+        min-height: 90px !important; /* Lebih pendek dari 125px */
         display: flex !important;
         flex-direction: column !important;
         justify-content: center !important;
         transition: all 0.3s ease-in-out !important;
     }
     div[data-testid="stMetric"]:hover {
-        transform: translateY(-5px) !important;
-        box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1) !important;
-        border-color: #1e40af !important;
+        transform: translateY(-3px) !important;
+        box-shadow: 0 8px 15px -5px rgba(0, 0, 0, 0.1) !important;
     }
 
-    [data-testid="stMetricLabel"] { color: #1e3a8a !important; font-weight: 700 !important; font-size: 0.85rem !important; }
-    [data-testid="stMetricValue"] { font-size: 24px !important; font-weight: 800 !important; color: #0f172a !important; }
+    [data-testid="stMetricLabel"] { 
+        color: #1e3a8a !important; 
+        font-weight: 700 !important; 
+        font-size: 0.8rem !important; /* Sedikit lebih kecil */
+        margin-bottom: -5px !important;
+    }
+    [data-testid="stMetricValue"] { 
+        font-size: 20px !important; /* Diperkecil dari 24px */
+        font-weight: 800 !important; 
+        color: #0f172a !important; 
+    }
 
     .summary-box {
         background-color: #f1f5f9 !important; padding: 10px !important; 
@@ -125,12 +124,10 @@ NAMA_FILE_LOGO = "logo-bmkg-transparan.png"
 
 with st.sidebar:
     if os.path.exists(NAMA_FILE_LOGO):
-        # Trik Base64: Mengubah gambar jadi kode teks supaya bisa dipanggil via HTML murni
         with open(NAMA_FILE_LOGO, "rb") as f:
             data = f.read()
             encoded = base64.b64encode(data).decode()
         
-        # Paksa rata tengah pakai HTML murni (Pasti Berhasil!)
         st.markdown(
             f"""
             <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: -15px; margin-bottom: 10px;">
@@ -162,7 +159,6 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
     
-   # Footer - Jarak dirapatkan
     st.markdown(f"""
         <div class="footer-card">
             <p style='font-size: 0.72rem; color: #1e3a8a; margin-bottom: 0; font-weight: 600;'>
@@ -253,22 +249,18 @@ if df_pred is not None and not df_pred.empty:
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
-        # 1. Garis Prediksi
         fig.add_trace(go.Scatter(
             x=df_plot[col_tgl], y=df_plot[col_val], 
             name='Prediksi', mode='lines',
             line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline'),
         ))
         
-        # --- LOGIKA BARU: DOT MAX & MIN SETIAP HARI ---
         unique_days = df_plot[col_tgl].dt.date.unique()
-        
         for day in unique_days:
             df_day = df_plot[df_plot[col_tgl].dt.date == day]
             idx_max = df_day[col_val].idxmax()
             idx_min = df_day[col_val].idxmin()
             
-            # Marker Max Harian
             fig.add_trace(go.Scatter(
                 x=[df_day.loc[idx_max, col_tgl]], y=[df_day.loc[idx_max, col_val]],
                 mode='markers+text', name=f'Max {day}',
@@ -277,7 +269,6 @@ if df_pred is not None and not df_pred.empty:
                 textposition="top center", showlegend=False
             ))
             
-            # Marker Min Harian
             fig.add_trace(go.Scatter(
                 x=[df_day.loc[idx_min, col_tgl]], y=[df_day.loc[idx_min, col_val]],
                 mode='markers+text', name=f'Min {day}',
@@ -286,7 +277,6 @@ if df_pred is not None and not df_pred.empty:
                 textposition="bottom center", showlegend=False
             ))
 
-        # 2. History Data
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'Psr. Ikan (Hist)', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
@@ -299,7 +289,6 @@ if df_pred is not None and not df_pred.empty:
                         line=dict(color=color, width=3.5, shape='spline'),
                     ))
 
-        # 3. Garis Sekarang
         y_max_axis = df_plot[col_val].max() + 0.3
         y_min_axis = df_plot[col_val].min() - 0.2
 
@@ -315,7 +304,6 @@ if df_pred is not None and not df_pred.empty:
             showlegend=False
         ))
         
-        # Threshold
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444")
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c")
         

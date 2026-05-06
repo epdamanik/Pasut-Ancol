@@ -18,9 +18,21 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    .block-container { padding-top: 2.2rem !important; padding-bottom: 0rem !important; max-width: 95% !important; }
+    /* Merapatkan container utama ke atas */
+    .block-container { 
+        padding-top: 0.5rem !important; 
+        padding-bottom: 0rem !important; 
+        max-width: 95% !important; 
+    }
     .stApp { background-color: #ffffff; }
-    .header-text { text-align: center; width: 100%; margin-top: -25px; margin-bottom: 15px; }
+    
+    /* Merapatkan Header Utama ke paling atas */
+    .header-text { 
+        text-align: center; 
+        width: 100%; 
+        margin-top: -15px; 
+        margin-bottom: 10px; 
+    }
 
     /* --- FIX LOGO CENTER TOTAL --- */
     [data-testid="stSidebar"] [data-testid="stImage"] {
@@ -61,26 +73,29 @@ st.markdown("""
     }
 
     [data-testid="stMetricValue"] { 
-        font-size: 15px !important; /* Ukuran pas untuk teks sampingan */
+        font-size: 15px !important; 
         font-weight: 800 !important; 
         color: #0f172a !important; 
         white-space: nowrap !important;
     }
 
-    /* Hilangkan panah delta bawaan jika masih ada */
+    /* Hilangkan panah delta bawaan */
     div[data-testid="stMetricDelta"] { display: none !important; }
 
     div[data-testid="column"] { padding: 0 5px !important; }
 
     .summary-box {
-        background-color: #f1f5f9 !important; padding: 10px !important; 
-        border-radius: 10px !important; margin-bottom: 15px !important; 
-        border-left: 5px solid #1e3a8a !important; text-align: center !important;
+        background-color: #f1f5f9 !important; 
+        padding: 8px !important; 
+        border-radius: 10px !important; 
+        margin-bottom: 10px !important; 
+        border-left: 5px solid #1e3a8a !important; 
+        text-align: center !important;
     }
-    .summary-text { font-weight: 850 !important; font-size: 0.95rem !important; color: #0f172a !important; }
+    .summary-text { font-weight: 850 !important; font-size: 0.9rem !important; color: #0f172a !important; }
 
     .footer-card {
-        margin-top: 50px; padding: 12px; border-radius: 10px; 
+        margin-top: 30px; padding: 12px; border-radius: 10px; 
         background-color: #f8fafc; border: 1px solid #e2e8f0; 
         text-align: center;
     }
@@ -224,7 +239,7 @@ if df_pred is not None and not df_pred.empty:
     # Kolom 1: Prediksi
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
-    # Kolom 2: AWS (Manual Delta Horizontal)
+    # Kolom 2: AWS
     if live_data['aws']:
         d_aws = live_data['aws'] - h_now
         icon_aws = "🔺" if d_aws > 0 else "🔹"
@@ -232,7 +247,7 @@ if df_pred is not None and not df_pred.empty:
     else:
         m2.metric("AWS Tj. Priok", "N/A")
 
-    # Kolom 3: Psr. Ikan (Manual Delta Horizontal)
+    # Kolom 3: Psr. Ikan
     if live_data['bpbd']:
         d_bpbd = live_data['bpbd'] - h_now
         icon_bpbd = "🔺" if d_bpbd > 0 else "🔹"

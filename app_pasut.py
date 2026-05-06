@@ -67,18 +67,19 @@ st.markdown("""
         margin: 0 auto !important;
     }
 
-    /* --- GAYA METRIK (SUPER TIPIS & DELTA DI SAMPING) --- */
+    /* --- GAYA METRIK: CSS GRID (TIDAK AKAN TUMPANG TINDIH LAGI) --- */
     div[data-testid="stMetric"] {
-        background-color: #ffffff !important; 
+        display: grid !important;
+        grid-template-columns: max-content auto !important; /* Kolom 1 utk Value, Kolom 2 utk Delta */
+        grid-template-rows: auto auto !important;
+        align-items: baseline !important;
+        column-gap: 8px !important;
+        padding: 8px 12px !important; /* Padding proporsional, tipis tapi aman */
+        background-color: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
-        border-left: 5px solid #1e40af !important; 
-        padding: 2px 10px 6px 10px !important; /* Dibuat super tipis */
+        border-left: 5px solid #1e40af !important;
         border-radius: 8px !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
-        min-height: 55px !important; /* Tinggi dipangkas habis */
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
         transition: all 0.3s ease-in-out !important;
     }
     div[data-testid="stMetric"]:hover {
@@ -86,42 +87,35 @@ st.markdown("""
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
     }
 
-    [data-testid="stMetricLabel"] { 
-        color: #1e3a8a !important; 
-        font-weight: 700 !important; 
-        font-size: 0.75rem !important; 
-        margin-bottom: -15px !important; /* Tarik value ke atas */
+    [data-testid="stMetricLabel"] {
+        grid-column: 1 / 3 !important; /* Span full width di atas */
+        grid-row: 1 !important;
+        margin-bottom: 2px !important; /* Margin normal, JANGAN dibikin negatif */
+        color: #1e3a8a !important;
+        font-weight: 700 !important;
+        font-size: 0.8rem !important;
     }
     
-    [data-testid="stMetricValue"] { 
-        font-size: 18px !important; 
-        font-weight: 800 !important; 
-        color: #0f172a !important; 
-        line-height: 1 !important;
-    }
-
-    /* Memaksa Value dan Delta menjadi sejajar (bersebelahan) */
-    [data-testid="stMetric"] > div:nth-child(2) {
-        display: flex !important;
-        flex-direction: row !important;
-        align-items: baseline !important;
-        gap: 6px !important;
+    [data-testid="stMetricValue"] {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+        font-size: 1.3rem !important;
+        font-weight: 800 !important;
+        color: #0f172a !important;
     }
     
     [data-testid="stMetricDelta"] {
-        font-size: 13px !important;
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+        justify-self: start !important; /* Mepet ke kiri nempel sama value */
+        font-size: 0.9rem !important;
         font-weight: 700 !important;
-    }
-    [data-testid="stMetricDelta"] > div {
-        display: flex !important;
-        flex-direction: row !important;
-        align-items: center !important;
     }
 
     /* --- SUMMARY BOX --- */
     .summary-box {
-        background-color: #f1f5f9 !important; padding: 6px !important; 
-        border-radius: 8px !important; margin-bottom: 8px !important; 
+        background-color: #f1f5f9 !important; padding: 8px !important; 
+        border-radius: 8px !important; margin-bottom: 12px !important; 
         border-left: 5px solid #1e3a8a !important; text-align: center !important;
     }
     .summary-text { font-weight: 850 !important; font-size: 0.9rem !important; color: #0f172a !important; }
@@ -263,7 +257,7 @@ if df_pred is not None and not df_pred.empty:
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
-    # Hitung selisih dan lempar dalam bentuk kurung biar sejajar ke samping. Default delta normal: Positif Hijau, Negatif Merah.
+    # Perhitungan Selisih (Delta)
     selisih_aws = live_data['aws'] - h_now if live_data['aws'] else None
     selisih_bpbd = live_data['bpbd'] - h_now if live_data['bpbd'] else None
     

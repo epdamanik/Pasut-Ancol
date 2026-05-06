@@ -71,28 +71,23 @@ st.markdown("""
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
         border-left: 5px solid #1e40af !important; 
-        padding: 8px 15px !important; /* Diperkecil */
+        padding: 8px 15px !important;
         border-radius: 12px !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-        min-height: 90px !important; /* Lebih pendek dari 125px */
+        min-height: 90px !important; 
         display: flex !important;
         flex-direction: column !important;
         justify-content: center !important;
         transition: all 0.3s ease-in-out !important;
     }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-3px) !important;
-        box-shadow: 0 8px 15px -5px rgba(0, 0, 0, 0.1) !important;
-    }
-
-    [data-testid="stMetricLabel"] { 
+    div[data-testid="stMetricLabel"] { 
         color: #1e3a8a !important; 
         font-weight: 700 !important; 
-        font-size: 0.8rem !important; /* Sedikit lebih kecil */
+        font-size: 0.8rem !important; 
         margin-bottom: -5px !important;
     }
     [data-testid="stMetricValue"] { 
-        font-size: 20px !important; /* Diperkecil dari 24px */
+        font-size: 20px !important; 
         font-weight: 800 !important; 
         color: #0f172a !important; 
     }
@@ -109,7 +104,6 @@ st.markdown("""
         background-color: #f8fafc; border: 1px solid #e2e8f0; 
         text-align: center;
     }
-    .dev-name { color: #475569; font-weight: 400; font-size: 0.55rem; margin-top: 2px; display: block; }
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -127,7 +121,6 @@ with st.sidebar:
         with open(NAMA_FILE_LOGO, "rb") as f:
             data = f.read()
             encoded = base64.b64encode(data).decode()
-        
         st.markdown(
             f"""
             <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: -15px; margin-bottom: 10px;">
@@ -228,10 +221,27 @@ if df_pred is not None and not df_pred.empty:
         st.warning(f"📢 STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
         play_audio("waspada ROB.mp3")
 
+    # --- SUMMARY BOX DENGAN JAM MAX/MIN ---
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
-        v_max_today, v_min_today = df_h[col_val].max(), df_h[col_val].min()
-        st.markdown(f'<div class="summary-box"><span class="summary-text">📅 {sekarang.strftime("%d %b %Y")} | <span style="color: #ef4444;">▲ MAX: {v_max_today:.2f}m</span> | <span style="color: #3b82f6;">▼ MIN: {v_min_today:.2f}m</span></span></div>', unsafe_allow_html=True)
+        idx_max = df_h[col_val].idxmax()
+        idx_min = df_h[col_val].idxmin()
+        
+        v_max = df_h.loc[idx_max, col_val]
+        t_max = df_h.loc[idx_max, col_tgl].strftime("%H:%M")
+        
+        v_min = df_h.loc[idx_min, col_val]
+        t_min = df_h.loc[idx_min, col_tgl].strftime("%H:%M")
+
+        st.markdown(f"""
+            <div class="summary-box">
+                <span class="summary-text">
+                    📅 {sekarang.strftime("%d %b %Y")} | 
+                    <span style="color: #ef4444;">▲ MAX: {v_max:.2f}m ({t_max})</span> | 
+                    <span style="color: #3b82f6;">▼ MIN: {v_min:.2f}m ({t_min})</span>
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
@@ -258,22 +268,22 @@ if df_pred is not None and not df_pred.empty:
         unique_days = df_plot[col_tgl].dt.date.unique()
         for day in unique_days:
             df_day = df_plot[df_plot[col_tgl].dt.date == day]
-            idx_max = df_day[col_val].idxmax()
-            idx_min = df_day[col_val].idxmin()
+            idx_max_p = df_day[col_val].idxmax()
+            idx_min_p = df_day[col_val].idxmin()
             
             fig.add_trace(go.Scatter(
-                x=[df_day.loc[idx_max, col_tgl]], y=[df_day.loc[idx_max, col_val]],
+                x=[df_day.loc[idx_max_p, col_tgl]], y=[df_day.loc[idx_max_p, col_val]],
                 mode='markers+text', name=f'Max {day}',
                 marker=dict(color='#ef4444', size=8, symbol='circle'),
-                text=[f"{df_day.loc[idx_max, col_val]:.2f}"],
+                text=[f"{df_day.loc[idx_max_p, col_val]:.2f}"],
                 textposition="top center", showlegend=False
             ))
             
             fig.add_trace(go.Scatter(
-                x=[df_day.loc[idx_min, col_tgl]], y=[df_day.loc[idx_min, col_val]],
+                x=[df_day.loc[idx_min_p, col_tgl]], y=[df_day.loc[idx_min_p, col_val]],
                 mode='markers+text', name=f'Min {day}',
                 marker=dict(color='#3b82f6', size=8, symbol='circle'),
-                text=[f"{df_day.loc[idx_min, col_val]:.2f}"],
+                text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"],
                 textposition="bottom center", showlegend=False
             ))
 

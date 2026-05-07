@@ -16,7 +16,6 @@ st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 # --- 1. KONFIGURASI HALAMAN & CSS ---
 st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="🌊")
 
-# --- CSS ANDA YANG SUDAH OPTIMAL (TIDAK BERUBAH) ---
 st.markdown("""
     <style>
     /* Merapatkan container utama ke atas */
@@ -96,7 +95,7 @@ st.markdown("""
         background-color: #f1f5f9 !important; 
         padding: 8px !important; 
         border-radius: 10px !important; 
-        margin-top: -15px !important; /* INI KUNCI ngerapetin ke header */
+        margin-top: -15px !important; 
         margin-bottom: 10px !important; 
         border-left: 5px solid #1e3a8a !important; 
         text-align: center !important;
@@ -155,18 +154,6 @@ with st.sidebar:
             </ul>
         </div>
         """, unsafe_allow_html=True)
-    
-    st.markdown(f"""
-        <div class="footer-card">
-            <p style='font-size: 0.72rem; color: #1e3a8a; margin-bottom: 0; font-weight: 600;'>
-                © 2026 Stasiun Meteorologi Maritim Tanjung Priok
-            </p>
-        </div>
-        <div style="text-align: center; margin-top: 15px; line-height: 1;">
-            <p style='font-size: 0.5rem; color: #94a3b8; margin-bottom: 2px;'>Developed by</p>
-            <p style="color: #64748b; font-weight: 500; font-size: 0.5rem; margin: 0;">E.P. Damanik</p>
-        </div>
-    """, unsafe_allow_html=True)
 
 # --- 4. HEADER UTAMA ---
 st.markdown(f"""
@@ -181,12 +168,6 @@ st.markdown(f"""
 FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
-
-def play_audio(file_path):
-    if os.path.exists(file_path):
-        with open(file_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-            st.components.v1.html(f'<audio autoplay><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>', height=0)
 
 def get_latest_from_csv(file_path):
     if not os.path.exists(file_path): return None
@@ -214,17 +195,6 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
-    check = {"Prediksi": h_now, "AWS": live_data['aws'], "PASAR IKAN": live_data['bpbd']}
-    awas = [n for n, v in check.items() if v and v >= 2.5]
-    waspada = [n for n, v in check.items() if v and 2.3 <= v < 2.5]
-
-    if awas:
-        st.error(f"🚨 STATUS: AWAS ROB! ({', '.join(awas)})", icon="⚠️")
-        play_audio("AWAS ROB.mp3") 
-    elif waspada:
-        st.warning(f"📢 STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
-        play_audio("waspada ROB.mp3")
-
     # --- SUMMARY BOX ---
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
@@ -244,96 +214,57 @@ if df_pred is not None and not df_pred.empty:
         """, unsafe_allow_html=True)
 
     m1, m2, m3, m4 = st.columns(4)
-    
-    # Kolom 1: Prediksi
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
-    # Kolom 2: AWS
+    # AWS Metric
     if live_data['aws']:
         d_aws = live_data['aws'] - h_now
-        icon_aws = "🔺" if d_aws > 0 else "🔻"
-        color_aws = "#ef4444" if d_aws > 0 else "#22c55e" # Merah jika di atas, Hijau jika di bawah
-        
-        m2.markdown(f"""
-            <div data-testid="stMetric">
-                <label data-testid="stMetricLabel">AWS Tj. Priok</label>
-                <div data-testid="stMetricValue">
-                    {live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem;">{icon_aws}({d_aws:+.2f})</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        m2.metric("AWS Tj. Priok", "N/A")
+        icon_aws, color_aws = ("▲", "#ef4444") if d_aws > 0 else ("▼", "#22c55e")
+        m2.markdown(f"""<div data-testid="stMetric"><label data-testid="stMetricLabel">AWS Tj. Priok</label><div data-testid="stMetricValue">{live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem; font-weight: bold;">{icon_aws}({d_aws:+.2f})</span></div></div>""", unsafe_allow_html=True)
+    else: m2.metric("AWS Tj. Priok", "N/A")
 
-    # Kolom 3: Psr. Ikan
+    # Psr Ikan Metric
     if live_data['bpbd']:
         d_bpbd = live_data['bpbd'] - h_now
-        icon_bpbd = "🔺" if d_bpbd > 0 else "🔻"
-        color_bpbd = "#ef4444" if d_bpbd > 0 else "#22c55e" # Merah jika di atas, Hijau jika di bawah
-
-        m3.markdown(f"""
-            <div data-testid="stMetric">
-                <label data-testid="stMetricLabel">TMA Psr. Ikan</label>
-                <div data-testid="stMetricValue">
-                    {live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.8rem;">{icon_bpbd}({d_bpbd:+.2f})</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        m3.metric("TMA Psr. Ikan", "N/A")
+        icon_bpbd, color_bpbd = ("▲", "#ef4444") if d_bpbd > 0 else ("▼", "#22c55e")
+        m3.markdown(f"""<div data-testid="stMetric"><label data-testid="stMetricLabel">TMA Psr. Ikan</label><div data-testid="stMetricValue">{live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.8rem; font-weight: bold;">{icon_bpbd}({d_bpbd:+.2f})</span></div></div>""", unsafe_allow_html=True)
+    else: m3.metric("TMA Psr. Ikan", "N/A")
     
-    # Kolom 4: Tren
-    h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
-    selisih = h_next - h_now
-    icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")
-    m4.metric("Tren (3j Kedepan)", f"{icon} {status}")
+    m4.metric("Tren (3j)", "📈 NAIK" if (df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val] - h_now) > 0.05 else "📉 TURUN")
 
-    # --- PLOTLY CHART (HEIGHT DIUBAH KE 400) ---
+    # --- PLOTLY CHART ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
-        fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', mode='lines', line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline')))
+        fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', mode='lines', line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2)))
         
-        unique_days = df_plot[col_tgl].dt.date.unique()
-        for day in unique_days:
-            df_day = df_plot[df_plot[col_tgl].dt.date == day]
-            idx_max_p, idx_min_p = df_day[col_val].idxmax(), df_day[col_val].idxmin()
-            fig.add_trace(go.Scatter(x=[df_day.loc[idx_max_p, col_tgl]], y=[df_day.loc[idx_max_p, col_val]], mode='markers+text', marker=dict(color='#ef4444', size=8), text=[f"{df_day.loc[idx_max_p, col_val]:.2f}"], textposition="top center", showlegend=False))
-            fig.add_trace(go.Scatter(x=[df_day.loc[idx_min_p, col_tgl]], y=[df_day.loc[idx_min_p, col_val]], mode='markers+text', marker=dict(color='#3b82f6', size=8), text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"], textposition="bottom center", showlegend=False))
-
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'Psr. Ikan (Hist)', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
                 dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
                 dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end)].sort_values('waktu')
-                if not dh.empty:
-                    fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, mode='lines', line=dict(color=color, width=3.5, shape='spline')))
+                if not dh.empty: fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, mode='lines', line=dict(color=color, width=3)))
 
-        y_max_axis, y_min_axis = df_plot[col_val].max() + 0.3, df_plot[col_val].min() - 0.2
-        fig.add_trace(go.Scatter(x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis], mode="lines+text", line=dict(color="#22c55e", width=2, dash="dash"), text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], textposition="top center", showlegend=False))
+        fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="🚨 AWAS", annotation_position="top right")
+        fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="📢 WASPADA", annotation_position="top right")
         
-        # Garis Limit ROB
-        fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444")
-        fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c")
-        
-        # --- PERUBAHAN UTAMA DI SINI ---
-        # Height gw set ke 400 (sebelumnya default plotly biasanya 450-500)
-        # Margin atas diturunin dikit biar mepet summary box
+        # Modebar dinonaktifkan di sini
         fig.update_layout(
             height=400, 
             template="plotly_white", 
-            margin=dict(l=10, r=10, t=30, b=10), 
-            hovermode="x unified", 
+            margin=dict(l=10, r=10, t=30, b=10),
+            hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        st.plotly_chart(fig, use_container_width=True)
+        # config={'displayModeBar': False} untuk mematikan modebar
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     st.divider()
     c1, c2, c3 = st.columns(3)
-    with c1: st.download_button("📥 AWS CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "AWS.csv", use_container_width=True)
-    with c2: st.download_button("📥 Psr. Ikan CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "Pasarikan.csv", use_container_width=True)
+    with c1: st.download_button("📥 AWS", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "AWS.csv", use_container_width=True)
+    with c2: st.download_button("📥 Psr. Ikan", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "Ikan.csv", use_container_width=True)
     with c3: 
         if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
 else:

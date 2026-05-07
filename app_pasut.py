@@ -20,7 +20,7 @@ st.markdown("""
     <style>
     /* --- TAMBAHAN FIX PEMBUNGKUS KALENDER --- */
     [data-baseweb="popover"] {
-        transform: scale(1) !important;
+        transform: scale(0.95) !important;
         transform-origin: top left !important;
     }
     [data-baseweb="popover"] > div {

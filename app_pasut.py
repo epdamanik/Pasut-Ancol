@@ -314,8 +314,27 @@ if df_pred is not None and not df_pred.empty:
 
         y_max_axis, y_min_axis = df_plot[col_val].max() + 0.3, df_plot[col_val].min() - 0.2
         fig.add_trace(go.Scatter(x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis], mode="lines+text", line=dict(color="#22c55e", width=2, dash="dash"), text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], textposition="top center", showlegend=False))
-        fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444")
-        fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c")
+        # Garis AWAS ROB (2.5)
+        fig.add_hline(
+            y=2.5, 
+            line_dash="dash", 
+            line_color="#ef4444", 
+            annotation_text="🚨 AWAS ROB", 
+            annotation_position="top right",
+            annotation_font_color="#ef4444",
+            annotation_font_size=12
+        )
+        
+        # Garis WASPADA ROB (2.3)
+        fig.add_hline(
+            y=2.3, 
+            line_dash="dash", 
+            line_color="#ea580c", 
+            annotation_text="📢 WASPADA ROB", 
+            annotation_position="top right",
+            annotation_font_color="#ea580c",
+            annotation_font_size=12
+        )
         
         fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True)

@@ -16,6 +16,7 @@ st_autorefresh(interval=seconds_to_next * 1000, key="datarefresh")
 # --- 1. KONFIGURASI HALAMAN & CSS ---
 st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="🌊")
 
+# --- CSS ANDA YANG SUDAH OPTIMAL (TIDAK BERUBAH) ---
 st.markdown("""
     <style>
     /* Merapatkan container utama ke atas */
@@ -95,7 +96,7 @@ st.markdown("""
         background-color: #f1f5f9 !important; 
         padding: 8px !important; 
         border-radius: 10px !important; 
-        margin-top: -15px !important; 
+        margin-top: -15px !important; /* INI KUNCI ngerapetin ke header */
         margin-bottom: 10px !important; 
         border-left: 5px solid #1e3a8a !important; 
         text-align: center !important;
@@ -250,15 +251,14 @@ if df_pred is not None and not df_pred.empty:
     # Kolom 2: AWS
     if live_data['aws']:
         d_aws = live_data['aws'] - h_now
-        # Menggunakan karakter unicode segitiga (▲/▼) agar warnanya ikut dengan style color
-        icon_aws = "▲" if d_aws > 0 else "▼"
-        color_aws = "#ef4444" if d_aws > 0 else "#22c55e"
+        icon_aws = "🔺" if d_aws > 0 else "🔻"
+        color_aws = "#ef4444" if d_aws > 0 else "#22c55e" # Merah jika di atas, Hijau jika di bawah
         
         m2.markdown(f"""
             <div data-testid="stMetric">
                 <label data-testid="stMetricLabel">AWS Tj. Priok</label>
                 <div data-testid="stMetricValue">
-                    {live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem; font-weight: bold;">{icon_aws} ({d_aws:+.2f})</span>
+                    {live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem;">{icon_aws}({d_aws:+.2f})</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -268,14 +268,14 @@ if df_pred is not None and not df_pred.empty:
     # Kolom 3: Psr. Ikan
     if live_data['bpbd']:
         d_bpbd = live_data['bpbd'] - h_now
-        icon_bpbd = "▲" if d_bpbd > 0 else "▼"
-        color_bpbd = "#ef4444" if d_bpbd > 0 else "#22c55e"
+        icon_bpbd = "🔺" if d_bpbd > 0 else "🔻"
+        color_bpbd = "#ef4444" if d_bpbd > 0 else "#22c55e" # Merah jika di atas, Hijau jika di bawah
 
         m3.markdown(f"""
             <div data-testid="stMetric">
                 <label data-testid="stMetricLabel">TMA Psr. Ikan</label>
                 <div data-testid="stMetricValue">
-                    {live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.8rem; font-weight: bold;">{icon_bpbd} ({d_bpbd:+.2f})</span>
+                    {live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.8rem;">{icon_bpbd}({d_bpbd:+.2f})</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -288,7 +288,7 @@ if df_pred is not None and not df_pred.empty:
     icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")
     m4.metric("Tren (3j Kedepan)", f"{icon} {status}")
 
-    # --- PLOTLY CHART ---
+    # --- PLOTLY CHART (HEIGHT DIUBAH KE 400) ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
@@ -314,29 +314,20 @@ if df_pred is not None and not df_pred.empty:
         y_max_axis, y_min_axis = df_plot[col_val].max() + 0.3, df_plot[col_val].min() - 0.2
         fig.add_trace(go.Scatter(x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis], mode="lines+text", line=dict(color="#22c55e", width=2, dash="dash"), text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], textposition="top center", showlegend=False))
         
-        # Garis AWAS ROB (2.5)
-        fig.add_hline(
-            y=2.5, 
-            line_dash="dash", 
-            line_color="#ef4444", 
-            annotation_text="🚨 AWAS ROB", 
-            annotation_position="top right",
-            annotation_font_color="#ef4444",
-            annotation_font_size=12
-        )
+        # Garis Limit ROB
+        fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444")
+        fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c")
         
-        # Garis WASPADA ROB (2.3)
-        fig.add_hline(
-            y=2.3, 
-            line_dash="dash", 
-            line_color="#ea580c", 
-            annotation_text="📢 WASPADA ROB", 
-            annotation_position="top right",
-            annotation_font_color="#ea580c",
-            annotation_font_size=12
+        # --- PERUBAHAN UTAMA DI SINI ---
+        # Height gw set ke 400 (sebelumnya default plotly biasanya 450-500)
+        # Margin atas diturunin dikit biar mepet summary box
+        fig.update_layout(
+            height=400, 
+            template="plotly_white", 
+            margin=dict(l=10, r=10, t=30, b=10), 
+            hovermode="x unified", 
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        
-        fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True)
 
     st.divider()

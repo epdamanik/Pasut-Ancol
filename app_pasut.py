@@ -22,7 +22,7 @@ st.markdown("""
     .block-container { 
         padding-top: 2rem !important; 
         padding-bottom: 0rem !important; 
-        max-width: 75% !important; 
+        max-width: 100% !important; 
     }
     
     /* Menghilangkan gap vertikal bawaan streamlit antar elemen */

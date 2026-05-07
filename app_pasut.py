@@ -18,9 +18,9 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    /* FIX KALENDER: Menggunakan Popover selector agar CSS tembus ke portal luar */
-    div[data-baseweb="popover"] {
-        transform: scale(0.75) !important;
+    /* --- INI SAKTI BRE, MAKSA SKALA KALENDER --- */
+    [data-baseweb="popover"] {
+        transform: scale(0.6) !important;
         transform-origin: top left !important;
     }
 
@@ -130,7 +130,6 @@ with st.sidebar:
         with open(NAMA_FILE_LOGO, "rb") as f:
             data = f.read()
             encoded = base64.b64encode(data).decode()
-        # MENAMBAHKAN MARGIN TOP PADA LOGO
         st.markdown(
             f"""
             <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 25px; margin-bottom: 10px;">
@@ -140,7 +139,6 @@ with st.sidebar:
             unsafe_allow_html=True
         )
     
-    # MENAMBAHKAN MARGIN TOP PADA TULISAN STASIUN
     st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: 15px; font-size: 0.85rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
@@ -236,14 +234,12 @@ if df_pred is not None and not df_pred.empty:
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
-    # Kolom 2: AWS
     if live_data['aws']:
         d_aws = live_data['aws'] - h_now
         icon_aws, color_aws = ("▲", "#ef4444") if d_aws > 0 else ("▼", "#22c55e")
         m2.markdown(f"""<div data-testid="stMetric"><label data-testid="stMetricLabel">AWS Tj. Priok</label><div data-testid="stMetricValue">{live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem; font-weight: bold;">{icon_aws} ({d_aws:+.2f})</span></div></div>""", unsafe_allow_html=True)
     else: m2.metric("AWS Tj. Priok", "N/A")
 
-    # Kolom 3: Psr. Ikan
     if live_data['bpbd']:
         d_bpbd = live_data['bpbd'] - h_now
         icon_bpbd, color_bpbd = ("▲", "#ef4444") if d_bpbd > 0 else ("▼", "#22c55e")

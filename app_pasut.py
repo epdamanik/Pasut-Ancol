@@ -335,8 +335,8 @@ if df_pred is not None and not df_pred.empty:
             annotation_font_size=12
         )
         
-        # Update Tinggi Grafik (Height) ke 450
-        fig.update_layout(height=450, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        # Update Tinggi Grafik (Height) ke 470
+        fig.update_layout(height=470, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         
         # Nonaktifkan Modebar menggunakan parameter config
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})

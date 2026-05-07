@@ -25,14 +25,23 @@ st.markdown("""
         max-width: 100% !important; 
     }
     
-    /* Menghilangkan gap vertikal bawaan streamlit antar elemen */
+    /* TRICK: Memberikan ruang ekstra di dalam sidebar */
+    [data-testid="stSidebarUserContent"] {
+        padding-top: 2rem !important;
+    }
+
+    /* Memaksa dropdown kalender agar lebih compact dan punya prioritas layar */
+    div[data-baseweb="datepicker"] {
+        transform: scale(0.95); /* Sedikit mengecilkan visual kalender */
+        transform-origin: top left;
+    }
+
     [data-testid="stVerticalBlock"] > div {
         gap: 0px !important;
     }
 
     .stApp { background-color: #ffffff; }
     
-    /* Merapatkan Header Utama */
     .header-text { 
         text-align: center; 
         width: 100%; 
@@ -41,16 +50,7 @@ st.markdown("""
         padding-bottom: 0px !important;
     }
 
-    /* FIX LOGO CENTER SIDEBAR */
-    [data-testid="stSidebar"] [data-testid="stImage"] {
-        text-align: center !important;
-        display: block !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        width: 100% !important;
-    }
-
-    /* GAYA METRIK (ULTRA SLIM) */
+    /* GAYA METRIK */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
@@ -76,14 +76,10 @@ st.markdown("""
         font-size: 15px !important; 
         font-weight: 800 !important; 
         color: #0f172a !important; 
-        white-space: nowrap !important;
     }
 
     div[data-testid="stMetricDelta"] { display: none !important; }
 
-    div[data-testid="column"] { padding: 0 5px !important; }
-
-    /* Summary Box */
     .summary-box {
         background-color: #f1f5f9 !important; 
         padding: 8px !important; 
@@ -113,15 +109,16 @@ sekarang_naive = sekarang.replace(tzinfo=None)
 NAMA_FILE_LOGO = "logo-bmkg-transparan.png" 
 
 with st.sidebar:
-    # Sedikit ruang tambahan di atas logo biar gak mepet browser
-    st.markdown("<br>", unsafe_allow_html=True)
+    # Menggunakan container kosong sebagai spacer atas
+    st.container() 
+    
     if os.path.exists(NAMA_FILE_LOGO):
         with open(NAMA_FILE_LOGO, "rb") as f:
             data = f.read()
             encoded = base64.b64encode(data).decode()
         st.markdown(
             f"""
-            <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: -15px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-bottom: 10px;">
                 <img src="data:image/png;base64,{encoded}" style="width: 85px; height: auto;">
             </div>
             """,
@@ -131,7 +128,7 @@ with st.sidebar:
     st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -5px; font-size: 0.85rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
-    # RENTANG WAKTU (Kalender)
+    # KALENDER DI SINI
     tgl_range = st.date_input("🗓️ Rentang Waktu Grafik", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
     
     st.link_button("🌐 Web BMKG Tanjung Priok", "https://bmkgtanjungpriok.info/", use_container_width=True)
@@ -143,7 +140,7 @@ with st.sidebar:
         </div>
         <br>
         <div style="text-align: justify; font-size: 0.95rem; color: #475569;">
-            <strong>⚡ Real-time:</strong> AWS Priok & Pintu Air Pasar Ikan.
+            <strong>⚡ Real-time:</strong> AWS Priok & Psr. Ikan.
         </div>
         """, unsafe_allow_html=True)
     
@@ -187,11 +184,9 @@ def load_prediction():
     df = pd.read_excel(FILE_PREDIKSI, engine='openpyxl')
     t_col = next((c for c in ['tanggal_prediksi', 'Waktu_WIB', 'Waktu'] if c in df.columns), None)
     v_col = next((c for c in ['wl_prediksi', 'Tinggi_Navigasi_m'] if c in df.columns), None)
-    if t_col: 
-        df[t_col] = pd.to_datetime(df[t_col], format='mixed', errors='coerce')
+    if t_col: df[t_col] = pd.to_datetime(df[t_col], format='mixed', errors='coerce')
     return df.dropna(subset=[t_col, v_col]).sort_values(t_col), t_col, v_col
 
-# --- 6. EXECUTION ---
 df_pred, col_tgl, col_val = load_prediction()
 live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_from_csv(FILE_HISTORY_BPBD)}
 
@@ -199,20 +194,17 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
-    # --- SUMMARY BOX ---
+    # Summary Box
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         idx_max = df_h[col_val].idxmax()
         idx_min = df_h[col_val].idxmin()
-        v_max, t_max = df_h.loc[idx_max, col_val], df_h.loc[idx_max, col_tgl].strftime("%H:%M")
-        v_min, t_min = df_h.loc[idx_min, col_val], df_h.loc[idx_min, col_tgl].strftime("%H:%M")
-
         st.markdown(f"""
             <div class="summary-box">
                 <span class="summary-text">
                     📅 {sekarang.strftime("%d %b %Y")} | 
-                    <span style="color: #ef4444;">▲ MAX: {v_max:.2f}m ({t_max})</span> | 
-                    <span style="color: #3b82f6;">▼ MIN: {v_min:.2f}m ({t_min})</span>
+                    <span style="color: #ef4444;">▲ MAX: {df_h.loc[idx_max, col_val]:.2f}m</span> | 
+                    <span style="color: #3b82f6;">▼ MIN: {df_h.loc[idx_min, col_val]:.2f}m</span>
                 </span>
             </div>
         """, unsafe_allow_html=True)
@@ -220,7 +212,6 @@ if df_pred is not None and not df_pred.empty:
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
-    # Metrics
     for key, label, col in [("aws", "AWS Tj. Priok", m2), ("bpbd", "TMA Psr. Ikan", m3)]:
         val = live_data[key]
         if val:
@@ -229,30 +220,25 @@ if df_pred is not None and not df_pred.empty:
             col.markdown(f'<div data-testid="stMetric"><label data-testid="stMetricLabel">{label}</label><div data-testid="stMetricValue">{val:.2f} m <span style="color: {color}; font-size: 0.8rem; font-weight: bold;">{icon} ({diff:+.2f})</span></div></div>', unsafe_allow_html=True)
         else: col.metric(label, "N/A")
 
-    # Tren
     h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
-    icon_t = "📈 NAIK" if (h_next - h_now) > 0.05 else "📉 TURUN"
-    m4.metric("Tren (3j Kedepan)", icon_t)
+    m4.metric("Tren (3j Kedepan)", "📈 NAIK" if (h_next - h_now) > 0.05 else "📉 TURUN")
 
-    # --- PLOTLY CHART ---
+    # Chart
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
         fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', mode='lines', line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2)))
-        
         for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'Psr. Ikan (Hist)', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
                 dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
                 dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end)].sort_values('waktu')
-                if not dh.empty:
-                    fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, mode='lines', line=dict(color=color, width=3)))
+                if not dh.empty: fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, mode='lines', line=dict(color=color, width=3)))
 
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="🚨 AWAS", annotation_position="top right")
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="📢 WASPADA", annotation_position="top right")
-        
         fig.update_layout(height=400, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 

@@ -247,11 +247,22 @@ if df_pred is not None and not df_pred.empty:
     # Kolom 1: Prediksi
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
+   # --- Perubahan di Bagian Kolom 2 dan Kolom 3 ---
+
     # Kolom 2: AWS
     if live_data['aws']:
         d_aws = live_data['aws'] - h_now
         icon_aws = "🔺" if d_aws > 0 else "🔹"
-        m2.metric("AWS Tj. Priok", f"{live_data['aws']:.2f} m {icon_aws}({d_aws:+.2f})")
+        color_aws = "#ef4444" if d_aws > 0 else "#22c55e" # Merah jika di atas, Hijau jika di bawah
+        
+        m2.markdown(f"""
+            <div data-testid="stMetric">
+                <label data-testid="stMetricLabel">AWS Tj. Priok</label>
+                <div data-testid="stMetricValue">
+                    {live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem;">{icon_aws}({d_aws:+.2f})</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
     else:
         m2.metric("AWS Tj. Priok", "N/A")
 
@@ -259,7 +270,16 @@ if df_pred is not None and not df_pred.empty:
     if live_data['bpbd']:
         d_bpbd = live_data['bpbd'] - h_now
         icon_bpbd = "🔺" if d_bpbd > 0 else "🔹"
-        m3.metric("TMA Psr. Ikan", f"{live_data['bpbd']:.2f} m {icon_bpbd}({d_bpbd:+.2f})")
+        color_bpbd = "#ef4444" if d_bpbd > 0 else "#22c55e" # Merah jika di atas, Hijau jika di bawah
+
+        m3.markdown(f"""
+            <div data-testid="stMetric">
+                <label data-testid="stMetricLabel">TMA Psr. Ikan</label>
+                <div data-testid="stMetricValue">
+                    {live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.8rem;">{icon_bpbd}({d_bpbd:+.2f})</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
     else:
         m3.metric("TMA Psr. Ikan", "N/A")
     

@@ -7,7 +7,7 @@ from streamlit_autorefresh import st_autorefresh
 import os
 import base64
 
-# --- 0. SMART AUTO REFRESH (Sync tiap 15 Menit) ---
+# --- 0. SMART AUTO REFRESH ---
 now_sync = datetime.now()
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
 if seconds_to_next <= 0: seconds_to_next = 900
@@ -18,21 +18,24 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    /* Merapatkan container utama ke atas */
+    /* --- INI BAGIAN NGE-SCALE KALENDER --- */
+    div[data-baseweb="datepicker"] {
+        transform: scale(0.8) !important;
+        transform-origin: top left !important;
+    }
+
     .block-container { 
         padding-top: 0.5rem !important; 
         padding-bottom: 0rem !important; 
         max-width: 95% !important; 
     }
     
-    /* Menghilangkan gap vertikal bawaan streamlit antar elemen */
     [data-testid="stVerticalBlock"] > div {
         gap: 0px !important;
     }
 
     .stApp { background-color: #ffffff; }
     
-    /* Merapatkan Header Utama ke paling atas */
     .header-text { 
         text-align: center; 
         width: 100%; 
@@ -41,7 +44,6 @@ st.markdown("""
         padding-bottom: 0px !important;
     }
 
-    /* FIX LOGO CENTER SIDEBAR */
     [data-testid="stSidebar"] [data-testid="stImage"] {
         text-align: center !important;
         display: block !important;
@@ -57,7 +59,6 @@ st.markdown("""
         display: inline-block !important;
     }
 
-    /* GAYA METRIK (ULTRA SLIM) */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
@@ -90,7 +91,6 @@ st.markdown("""
 
     div[data-testid="column"] { padding: 0 5px !important; }
 
-    /* Summary Box dirapatkan ke header dengan margin negatif */
     .summary-box {
         background-color: #f1f5f9 !important; 
         padding: 8px !important; 
@@ -124,7 +124,6 @@ with st.sidebar:
         with open(NAMA_FILE_LOGO, "rb") as f:
             data = f.read()
             encoded = base64.b64encode(data).decode()
-        # MENAMBAHKAN MARGIN TOP PADA LOGO
         st.markdown(
             f"""
             <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 25px; margin-bottom: 10px;">
@@ -134,7 +133,6 @@ with st.sidebar:
             unsafe_allow_html=True
         )
     
-    # MENAMBAHKAN MARGIN TOP PADA TULISAN STASIUN
     st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: 15px; font-size: 0.85rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
@@ -183,12 +181,6 @@ FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
 
-def play_audio(file_path):
-    if os.path.exists(file_path):
-        with open(file_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-            st.components.v1.html(f'<audio autoplay><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>', height=0)
-
 def get_latest_from_csv(file_path):
     if not os.path.exists(file_path): return None
     try:
@@ -215,18 +207,7 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
-    check = {"Prediksi": h_now, "AWS": live_data['aws'], "PASAR IKAN": live_data['bpbd']}
-    awas = [n for n, v in check.items() if v and v >= 2.5]
-    waspada = [n for n, v in check.items() if v and 2.3 <= v < 2.5]
-
-    if awas:
-        st.error(f"🚨 STATUS: AWAS ROB! ({', '.join(awas)})", icon="⚠️")
-        play_audio("AWAS ROB.mp3") 
-    elif waspada:
-        st.warning(f"📢 STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
-        play_audio("waspada ROB.mp3")
-
-    # --- SUMMARY BOX ---
+    # Summary Box
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         idx_max = df_h[col_val].idxmax()

@@ -18,18 +18,15 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    /* --- FIX KALENDER (DATEPICKER) SUPAYA MENGECIL & GAK KEPOTONG --- */
-    /* Kita hajar langsung ke elemen baseweb-nya */
-    div[data-baseweb="datepicker"], 
-    div[data-baseweb="calendar"] {
-        transform: scale(0.7) !important;
+    /* --- TAMBAHAN FIX PEMBUNGKUS KALENDER --- */
+    [data-baseweb="popover"] {
+        transform: scale(0.8) !important;
         transform-origin: top left !important;
     }
-    
-    /* Mencegah overflow pada container sidebar saat kalender buka */
-    [data-testid="stSidebar"] {
-        overflow: visible !important;
+    [data-baseweb="popover"] > div {
+        max-width: 260px !important;
     }
+    /* --------------------------------------- */
 
     /* Merapatkan container utama ke atas */
     .block-container { 
@@ -108,7 +105,7 @@ st.markdown("""
         background-color: #f1f5f9 !important; 
         padding: 8px !important; 
         border-radius: 10px !important; 
-        margin-top: -15px !important; 
+        margin-top: -15px !important; /* INI KUNCI ngerapetin ke header */
         margin-bottom: 10px !important; 
         border-left: 5px solid #1e3a8a !important; 
         text-align: center !important;
@@ -194,6 +191,12 @@ FILE_PREDIKSI = 'prediksi_pasut_ancol_2026_FINAL_WIB.xlsx'
 FILE_HISTORY_AWS = 'history_aws_priok.csv' 
 FILE_HISTORY_BPBD = 'history_bpbd_pasarikan.csv'
 
+def play_audio(file_path):
+    if os.path.exists(file_path):
+        with open(file_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+            st.components.v1.html(f'<audio autoplay><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>', height=0)
+
 def get_latest_from_csv(file_path):
     if not os.path.exists(file_path): return None
     try:
@@ -220,6 +223,17 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
+    check = {"Prediksi": h_now, "AWS": live_data['aws'], "PASAR IKAN": live_data['bpbd']}
+    awas = [n for n, v in check.items() if v and v >= 2.5]
+    waspada = [n for n, v in check.items() if v and 2.3 <= v < 2.5]
+
+    if awas:
+        st.error(f"🚨 STATUS: AWAS ROB! ({', '.join(awas)})", icon="⚠️")
+        play_audio("AWAS ROB.mp3") 
+    elif waspada:
+        st.warning(f"📢 STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
+        play_audio("waspada ROB.mp3")
+
     # --- SUMMARY BOX ---
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
@@ -239,21 +253,29 @@ if df_pred is not None and not df_pred.empty:
         """, unsafe_allow_html=True)
 
     m1, m2, m3, m4 = st.columns(4)
+    
+    # Kolom 1: Prediksi
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
+    # Kolom 2: AWS
     if live_data['aws']:
         d_aws = live_data['aws'] - h_now
         icon_aws, color_aws = ("▲", "#ef4444") if d_aws > 0 else ("▼", "#22c55e")
         m2.markdown(f"""<div data-testid="stMetric"><label data-testid="stMetricLabel">AWS Tj. Priok</label><div data-testid="stMetricValue">{live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem; font-weight: bold;">{icon_aws} ({d_aws:+.2f})</span></div></div>""", unsafe_allow_html=True)
-    else: m2.metric("AWS Tj. Priok", "N/A")
+    else:
+        m2.metric("AWS Tj. Priok", "N/A")
 
+    # Kolom 3: Psr. Ikan
     if live_data['bpbd']:
         d_bpbd = live_data['bpbd'] - h_now
         icon_bpbd, color_bpbd = ("▲", "#ef4444") if d_bpbd > 0 else ("▼", "#22c55e")
         m3.markdown(f"""<div data-testid="stMetric"><label data-testid="stMetricLabel">TMA Psr. Ikan</label><div data-testid="stMetricValue">{live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.8rem; font-weight: bold;">{icon_bpbd} ({d_bpbd:+.2f})</span></div></div>""", unsafe_allow_html=True)
-    else: m3.metric("TMA Psr. Ikan", "N/A")
+    else:
+        m3.metric("TMA Psr. Ikan", "N/A")
     
-    selisih = (df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]) - h_now
+    # Kolom 4: Tren
+    h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
+    selisih = h_next - h_now
     icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")
     m4.metric("Tren (3j Kedepan)", f"{icon} {status}")
 
@@ -277,11 +299,16 @@ if df_pred is not None and not df_pred.empty:
                 dh = pd.read_csv(file)
                 dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
                 dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end)].sort_values('waktu')
-                if not dh.empty: fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, mode='lines', line=dict(color=color, width=3.5, shape='spline')))
+                if not dh.empty:
+                    fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, mode='lines', line=dict(color=color, width=3.5, shape='spline')))
 
+        y_max_axis, y_min_axis = df_plot[col_val].max() + 0.3, df_plot[col_val].min() - 0.2
+        fig.add_trace(go.Scatter(x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis], mode="lines+text", line=dict(color="#22c55e", width=2, dash="dash"), text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], textposition="top center", showlegend=False))
+        
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="🚨 AWAS ROB", annotation_position="top right", annotation_font_color="#ef4444", annotation_font_size=12)
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="📢 WASPADA ROB", annotation_position="top right", annotation_font_color="#ea580c", annotation_font_size=12)
         
+        # Update Tinggi Grafik ke 450 & Modebar Off
         fig.update_layout(height=450, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 

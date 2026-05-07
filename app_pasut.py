@@ -124,16 +124,18 @@ with st.sidebar:
         with open(NAMA_FILE_LOGO, "rb") as f:
             data = f.read()
             encoded = base64.b64encode(data).decode()
+        # MENAMBAHKAN MARGIN TOP PADA LOGO
         st.markdown(
             f"""
-            <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: -15px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 25px; margin-bottom: 10px;">
                 <img src="data:image/png;base64,{encoded}" style="width: 85px; height: auto;">
             </div>
             """,
             unsafe_allow_html=True
         )
     
-    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -5px; font-size: 0.85rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
+    # MENAMBAHKAN MARGIN TOP PADA TULISAN STASIUN
+    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: 15px; font-size: 0.85rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
     tgl_range = st.date_input("🗓️ Rentang Waktu Grafik", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
@@ -243,47 +245,23 @@ if df_pred is not None and not df_pred.empty:
         """, unsafe_allow_html=True)
 
     m1, m2, m3, m4 = st.columns(4)
-    
-    # Kolom 1: Prediksi
     m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
     
     # Kolom 2: AWS
     if live_data['aws']:
         d_aws = live_data['aws'] - h_now
-        icon_aws = "▲" if d_aws > 0 else "▼"
-        color_aws = "#ef4444" if d_aws > 0 else "#22c55e"
-        
-        m2.markdown(f"""
-            <div data-testid="stMetric">
-                <label data-testid="stMetricLabel">AWS Tj. Priok</label>
-                <div data-testid="stMetricValue">
-                    {live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem; font-weight: bold;">{icon_aws} ({d_aws:+.2f})</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        m2.metric("AWS Tj. Priok", "N/A")
+        icon_aws, color_aws = ("▲", "#ef4444") if d_aws > 0 else ("▼", "#22c55e")
+        m2.markdown(f"""<div data-testid="stMetric"><label data-testid="stMetricLabel">AWS Tj. Priok</label><div data-testid="stMetricValue">{live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem; font-weight: bold;">{icon_aws} ({d_aws:+.2f})</span></div></div>""", unsafe_allow_html=True)
+    else: m2.metric("AWS Tj. Priok", "N/A")
 
     # Kolom 3: Psr. Ikan
     if live_data['bpbd']:
         d_bpbd = live_data['bpbd'] - h_now
-        icon_bpbd = "▲" if d_bpbd > 0 else "▼"
-        color_bpbd = "#ef4444" if d_bpbd > 0 else "#22c55e"
-
-        m3.markdown(f"""
-            <div data-testid="stMetric">
-                <label data-testid="stMetricLabel">TMA Psr. Ikan</label>
-                <div data-testid="stMetricValue">
-                    {live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.8rem; font-weight: bold;">{icon_bpbd} ({d_bpbd:+.2f})</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        m3.metric("TMA Psr. Ikan", "N/A")
+        icon_bpbd, color_bpbd = ("▲", "#ef4444") if d_bpbd > 0 else ("▼", "#22c55e")
+        m3.markdown(f"""<div data-testid="stMetric"><label data-testid="stMetricLabel">TMA Psr. Ikan</label><div data-testid="stMetricValue">{live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.8rem; font-weight: bold;">{icon_bpbd} ({d_bpbd:+.2f})</span></div></div>""", unsafe_allow_html=True)
+    else: m3.metric("TMA Psr. Ikan", "N/A")
     
-    # Kolom 4: Tren
-    h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
-    selisih = h_next - h_now
+    selisih = (df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]) - h_now
     icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")
     m4.metric("Tren (3j Kedepan)", f"{icon} {status}")
 
@@ -307,38 +285,12 @@ if df_pred is not None and not df_pred.empty:
                 dh = pd.read_csv(file)
                 dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
                 dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end)].sort_values('waktu')
-                if not dh.empty:
-                    fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, mode='lines', line=dict(color=color, width=3.5, shape='spline')))
+                if not dh.empty: fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, mode='lines', line=dict(color=color, width=3.5, shape='spline')))
 
-        y_max_axis, y_min_axis = df_plot[col_val].max() + 0.3, df_plot[col_val].min() - 0.2
-        fig.add_trace(go.Scatter(x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis], mode="lines+text", line=dict(color="#22c55e", width=2, dash="dash"), text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], textposition="top center", showlegend=False))
+        fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="🚨 AWAS ROB", annotation_position="top right", annotation_font_color="#ef4444", annotation_font_size=12)
+        fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="📢 WASPADA ROB", annotation_position="top right", annotation_font_color="#ea580c", annotation_font_size=12)
         
-        # Garis AWAS ROB (2.5)
-        fig.add_hline(
-            y=2.5, 
-            line_dash="dash", 
-            line_color="#ef4444", 
-            annotation_text="🚨 AWAS ROB", 
-            annotation_position="top right",
-            annotation_font_color="#ef4444",
-            annotation_font_size=12
-        )
-        
-        # Garis WASPADA ROB (2.3)
-        fig.add_hline(
-            y=2.3, 
-            line_dash="dash", 
-            line_color="#ea580c", 
-            annotation_text="📢 WASPADA ROB", 
-            annotation_position="top right",
-            annotation_font_color="#ea580c",
-            annotation_font_size=12
-        )
-        
-        # Update Tinggi Grafik (Height) ke 450
         fig.update_layout(height=450, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        
-        # Nonaktifkan Modebar menggunakan parameter config
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     st.divider()

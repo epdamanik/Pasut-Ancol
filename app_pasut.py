@@ -250,7 +250,6 @@ if df_pred is not None and not df_pred.empty:
     # Kolom 2: AWS
     if live_data['aws']:
         d_aws = live_data['aws'] - h_now
-        # Menggunakan karakter unicode segitiga (▲/▼) agar warnanya ikut dengan style color
         icon_aws = "▲" if d_aws > 0 else "▼"
         color_aws = "#ef4444" if d_aws > 0 else "#22c55e"
         
@@ -336,8 +335,11 @@ if df_pred is not None and not df_pred.empty:
             annotation_font_size=12
         )
         
-        fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(fig, use_container_width=True)
+        # Update Tinggi Grafik (Height) ke 400
+        fig.update_layout(height=400, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        
+        # Nonaktifkan Modebar menggunakan parameter config
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     st.divider()
     c1, c2, c3 = st.columns(3)

@@ -122,6 +122,7 @@ if df_pred is not None and not df_pred.empty:
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="🚨 AWAS", annotation_position="top right")
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="📢 WASPADA", annotation_position="top right")
         
+        # --- PERUBAHAN POSISI LEGENDA KE KANAN & MATIKAN MODEBAR ---
         fig.update_layout(
             height=400, 
             template="plotly_white", 
@@ -129,15 +130,15 @@ if df_pred is not None and not df_pred.empty:
             hovermode="x unified",
             showlegend=True,
             legend=dict(
-                orientation="h", 
-                yanchor="bottom", 
-                y=1.02, 
-                xanchor="right", 
-                x=1
+                orientation="v",      # Vertical
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02                # Di sebelah kanan luar grafik
             )
         )
         
-        # --- HANYA MENAMBAHKAN CONFIG INI UNTUK MEMATIKAN MODEBAR ---
+        # config={'displayModeBar': False} untuk menghilangkan zoom, pan, dll yang nutupin legenda
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     st.divider()

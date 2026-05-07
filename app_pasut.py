@@ -20,7 +20,7 @@ st.markdown("""
     <style>
     /* --- INI BAGIAN NGE-SCALE KALENDER --- */
     div[data-baseweb="datepicker"] {
-        transform: scale(0.8) !important;
+        transform: scale(0.5) !important;
         transform-origin: top left !important;
     }
 

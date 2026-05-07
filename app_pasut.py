@@ -18,10 +18,17 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    /* --- INI SAKTI BRE, MAKSA SKALA KALENDER --- */
-    [data-baseweb="popover"] {
-        transform: scale(0.6) !important;
+    /* --- FIX KALENDER (DATEPICKER) SUPAYA MENGECIL & GAK KEPOTONG --- */
+    /* Kita hajar langsung ke elemen baseweb-nya */
+    div[data-baseweb="datepicker"], 
+    div[data-baseweb="calendar"] {
+        transform: scale(0.7) !important;
         transform-origin: top left !important;
+    }
+    
+    /* Mencegah overflow pada container sidebar saat kalender buka */
+    [data-testid="stSidebar"] {
+        overflow: visible !important;
     }
 
     /* Merapatkan container utama ke atas */

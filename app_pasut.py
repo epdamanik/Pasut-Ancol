@@ -18,27 +18,26 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    /* Merapatkan container utama ke atas */
+    /* Merapatkan container utama ke paling atas */
     .block-container { 
-        padding-top: 0.5rem !important; 
+        padding-top: 0rem !important; 
         padding-bottom: 0rem !important; 
         max-width: 95% !important; 
     }
     
-    /* Menghilangkan gap vertikal bawaan streamlit antar elemen */
-    [data-testid="stVerticalBlock"] > div {
+    /* Menghilangkan gap vertikal bawaan streamlit */
+    [data-testid="stVerticalBlock"] {
         gap: 0px !important;
     }
 
     .stApp { background-color: #ffffff; }
     
-    /* Merapatkan Header Utama ke paling atas */
+    /* Header Utama */
     .header-text { 
         text-align: center; 
         width: 100%; 
-        margin-top: -15px; 
+        margin-top: -10px; 
         margin-bottom: 0px !important;
-        padding-bottom: 0px !important;
     }
 
     /* FIX LOGO CENTER SIDEBAR */
@@ -50,22 +49,14 @@ st.markdown("""
         width: 100% !important;
     }
 
-    [data-testid="stSidebar"] [data-testid="stImage"] img {
-        max-width: 90px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        display: inline-block !important;
-    }
-
     /* GAYA METRIK (ULTRA SLIM) */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
         border-left: 4px solid #1e40af !important; 
-        padding: 4px 10px !important; 
+        padding: 2px 10px !important; 
         border-radius: 8px !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
-        min-height: 55px !important; 
+        min-height: 50px !important; 
         display: flex !important;
         flex-direction: column !important;
         justify-content: center !important;
@@ -74,40 +65,34 @@ st.markdown("""
     div[data-testid="stMetricLabel"] { 
         color: #1e3a8a !important; 
         font-weight: 700 !important; 
-        font-size: 0.7rem !important; 
-        margin-bottom: -10px !important; 
-        white-space: nowrap !important;
+        font-size: 0.65rem !important; 
+        margin-bottom: -12px !important; 
     }
 
     [data-testid="stMetricValue"] { 
-        font-size: 15px !important; 
+        font-size: 14px !important; 
         font-weight: 800 !important; 
-        color: #0f172a !important; 
-        white-space: nowrap !important;
     }
 
-    div[data-testid="stMetricDelta"] { display: none !important; }
-
-    div[data-testid="column"] { padding: 0 5px !important; }
-
-    /* Summary Box dirapatkan ke header dengan margin negatif */
+    /* Summary Box dirapatkan maksimal */
     .summary-box {
         background-color: #f1f5f9 !important; 
-        padding: 8px !important; 
-        border-radius: 10px !important; 
-        margin-top: -15px !important; 
-        margin-bottom: 10px !important; 
+        padding: 5px !important; 
+        border-radius: 8px !important; 
+        margin-top: -5px !important; 
+        margin-bottom: 5px !important; 
         border-left: 5px solid #1e3a8a !important; 
         text-align: center !important;
     }
-    .summary-text { font-weight: 850 !important; font-size: 0.9rem !important; color: #0f172a !important; }
+    .summary-text { font-weight: 800 !important; font-size: 0.85rem !important; color: #0f172a !important; }
 
-    .footer-card {
-        margin-top: 30px; padding: 12px; border-radius: 10px; 
-        background-color: #f8fafc; border: 1px solid #e2e8f0; 
-        text-align: center;
+    /* Menghilangkan margin di chart */
+    .stPlotlyChart {
+        margin-top: -10px !important;
     }
+    
     footer {visibility: hidden;}
+    hr {margin: 5px 0px !important;} /* Merapatkan garis pembatas */
     </style>
     """, unsafe_allow_html=True)
 
@@ -126,51 +111,26 @@ with st.sidebar:
             encoded = base64.b64encode(data).decode()
         st.markdown(
             f"""
-            <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: -15px; margin-bottom: 10px;">
-                <img src="data:image/png;base64,{encoded}" style="width: 85px; height: auto;">
+            <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: -10px; margin-bottom: 5px;">
+                <img src="data:image/png;base64,{encoded}" style="width: 70px; height: auto;">
             </div>
             """,
             unsafe_allow_html=True
         )
     
-    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -5px; font-size: 0.85rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: -5px; font-size: 0.8rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
     tgl_range = st.date_input("🗓️ Rentang Waktu Grafik", value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)))
-    st.link_button("🌐 Web BMKG Tanjung Priok", "https://bmkgtanjungpriok.info/", use_container_width=True)
+    st.link_button("🌐 Web BMKG", "https://bmkgtanjungpriok.info/", use_container_width=True)
     
     with st.expander("ℹ️ Info Sumber Data"):
-        st.markdown("""
-        <div style="text-align: justify; font-size: 0.95rem; color: #475569;">
-            <strong>📍 Prediksi:</strong><br>
-            Analisis Harmonik data TMA Pasar Ikan I (DSDA) Tahun 2025.
-        </div>
-        <br>
-        <div style="text-align: justify; font-size: 0.95rem; color: #475569;">
-            <strong>⚡ Real-time:</strong>
-            <ul style="margin-top: 5px; padding-left: 20px;">
-                <li>AWS Maritim Tanjung Priok (BMKG).</li>
-                <li>Pintu Air Pasar Ikan I (DSDA).</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown(f"""
-        <div class="footer-card">
-            <p style='font-size: 0.72rem; color: #1e3a8a; margin-bottom: 0; font-weight: 600;'>
-                © 2026 Stasiun Meteorologi Maritim Tanjung Priok
-            </p>
-        </div>
-        <div style="text-align: center; margin-top: 15px; line-height: 1;">
-            <p style='font-size: 0.5rem; color: #94a3b8; margin-bottom: 2px;'>Developed by</p>
-            <p style="color: #64748b; font-weight: 500; font-size: 0.5rem; margin: 0;">E.P. Damanik</p>
-        </div>
-    """, unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 0.8rem;'>Prediksi: Harmonik 2025.<br>Real-time: AWS Priok & Psr. Ikan.</div>", unsafe_allow_html=True)
 
 # --- 4. HEADER UTAMA ---
-st.markdown(f"""
+st.markdown("""
     <div class="header-text">
-        <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.6rem;">
+        <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.4rem;">
             MONITORING TINGGI MUKA AIR (TMA) REAL TIME
         </h2>
     </div>
@@ -213,16 +173,16 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
+    # Alert Area (Dikecilkan font-nya)
     check = {"Prediksi": h_now, "AWS": live_data['aws'], "PASAR IKAN": live_data['bpbd']}
     awas = [n for n, v in check.items() if v and v >= 2.5]
     waspada = [n for n, v in check.items() if v and 2.3 <= v < 2.5]
 
     if awas:
-        st.error(f"🚨 STATUS: AWAS ROB! ({', '.join(awas)})", icon="⚠️")
+        st.error(f"🚨 STATUS: AWAS ROB! ({', '.join(awas)})")
         play_audio("AWAS ROB.mp3") 
     elif waspada:
-        st.warning(f"📢 STATUS: WASPADA ROB! ({', '.join(waspada)})", icon="📢")
-        play_audio("waspada ROB.mp3")
+        st.warning(f"📢 STATUS: WASPADA ROB! ({', '.join(waspada)})")
 
     # --- SUMMARY BOX ---
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
@@ -250,100 +210,58 @@ if df_pred is not None and not df_pred.empty:
     # Kolom 2: AWS
     if live_data['aws']:
         d_aws = live_data['aws'] - h_now
-        # Menggunakan karakter unicode segitiga (▲/▼) agar warnanya ikut dengan style color
         icon_aws = "▲" if d_aws > 0 else "▼"
         color_aws = "#ef4444" if d_aws > 0 else "#22c55e"
-        
-        m2.markdown(f"""
-            <div data-testid="stMetric">
-                <label data-testid="stMetricLabel">AWS Tj. Priok</label>
-                <div data-testid="stMetricValue">
-                    {live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.8rem; font-weight: bold;">{icon_aws} ({d_aws:+.2f})</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        m2.metric("AWS Tj. Priok", "N/A")
+        m2.markdown(f"""<div data-testid="stMetric"><label data-testid="stMetricLabel">AWS Tj. Priok</label><div data-testid="stMetricValue">{live_data['aws']:.2f} m <span style="color: {color_aws}; font-size: 0.75rem;">{icon_aws}({d_aws:+.2f})</span></div></div>""", unsafe_allow_html=True)
+    else: m2.metric("AWS Tj. Priok", "N/A")
 
     # Kolom 3: Psr. Ikan
     if live_data['bpbd']:
         d_bpbd = live_data['bpbd'] - h_now
         icon_bpbd = "▲" if d_bpbd > 0 else "▼"
         color_bpbd = "#ef4444" if d_bpbd > 0 else "#22c55e"
-
-        m3.markdown(f"""
-            <div data-testid="stMetric">
-                <label data-testid="stMetricLabel">TMA Psr. Ikan</label>
-                <div data-testid="stMetricValue">
-                    {live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.8rem; font-weight: bold;">{icon_bpbd} ({d_bpbd:+.2f})</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        m3.metric("TMA Psr. Ikan", "N/A")
+        m3.markdown(f"""<div data-testid="stMetric"><label data-testid="stMetricLabel">TMA Psr. Ikan</label><div data-testid="stMetricValue">{live_data['bpbd']:.2f} m <span style="color: {color_bpbd}; font-size: 0.75rem;">{icon_bpbd}({d_bpbd:+.2f})</span></div></div>""", unsafe_allow_html=True)
+    else: m3.metric("TMA Psr. Ikan", "N/A")
     
     # Kolom 4: Tren
     h_next = df_pred.loc[(df_pred[col_tgl] - (sekarang_naive + timedelta(hours=3))).abs().idxmin(), col_val]
     selisih = h_next - h_now
-    icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAGNAN")
-    m4.metric("Tren (3j Kedepan)", f"{icon} {status}")
+    icon, status = ("📈", "NAIK") if selisih > 0.05 else ("📉", "TURUN") if selisih < -0.05 else ("↔️", "STAG")
+    m4.metric("Tren (3j)", f"{icon} {status}")
 
-    # --- PLOTLY CHART ---
+    # --- PLOTLY CHART (HEIGHT DIKURANGI KE 400) ---
     t_start, t_end = datetime.combine(tgl_range[0], datetime.min.time()), datetime.combine(tgl_range[1], datetime.max.time())
     fig = go.Figure()
     df_plot = df_pred[(df_pred[col_tgl] >= t_start) & (df_pred[col_tgl] <= t_end)].copy()
     
     if not df_plot.empty:
-        fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', mode='lines', line=dict(color='rgba(148, 163, 184, 0.7)', dash='dot', width=2, shape='spline')))
+        fig.add_trace(go.Scatter(x=df_plot[col_tgl], y=df_plot[col_val], name='Prediksi', mode='lines', line=dict(color='rgba(148, 163, 184, 0.5)', dash='dot', width=1.5)))
         
-        unique_days = df_plot[col_tgl].dt.date.unique()
-        for day in unique_days:
-            df_day = df_plot[df_plot[col_tgl].dt.date == day]
-            idx_max_p, idx_min_p = df_day[col_val].idxmax(), df_day[col_val].idxmin()
-            fig.add_trace(go.Scatter(x=[df_day.loc[idx_max_p, col_tgl]], y=[df_day.loc[idx_max_p, col_val]], mode='markers+text', marker=dict(color='#ef4444', size=8), text=[f"{df_day.loc[idx_max_p, col_val]:.2f}"], textposition="top center", showlegend=False))
-            fig.add_trace(go.Scatter(x=[df_day.loc[idx_min_p, col_tgl]], y=[df_day.loc[idx_min_p, col_val]], mode='markers+text', marker=dict(color='#3b82f6', size=8), text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"], textposition="bottom center", showlegend=False))
-
-        for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'Psr. Ikan (Hist)', '#f59e0b')]:
+        for file, label, color in [(FILE_HISTORY_AWS, 'AWS', '#7c3aed'), (FILE_HISTORY_BPBD, 'Psr. Ikan', '#f59e0b')]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
                 dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
                 dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end)].sort_values('waktu')
                 if not dh.empty:
-                    fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, mode='lines', line=dict(color=color, width=3.5, shape='spline')))
+                    fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, mode='lines', line=dict(color=color, width=3)))
 
-        y_max_axis, y_min_axis = df_plot[col_val].max() + 0.3, df_plot[col_val].min() - 0.2
-        fig.add_trace(go.Scatter(x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis], mode="lines+text", line=dict(color="#22c55e", width=2, dash="dash"), text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], textposition="top center", showlegend=False))
+        # Garis Limit
+        fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="AWAS", annotation_position="top right")
+        fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="WASPADA", annotation_position="top right")
         
-        # Garis AWAS ROB (2.5)
-        fig.add_hline(
-            y=2.5, 
-            line_dash="dash", 
-            line_color="#ef4444", 
-            annotation_text="🚨 AWAS ROB", 
-            annotation_position="top right",
-            annotation_font_color="#ef4444",
-            annotation_font_size=12
+        # Penyesuaian Layout (Height 400 & Legend di atas)
+        fig.update_layout(
+            height=380, 
+            template="plotly_white", 
+            margin=dict(l=10, r=10, t=20, b=10), 
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        
-        # Garis WASPADA ROB (2.3)
-        fig.add_hline(
-            y=2.3, 
-            line_dash="dash", 
-            line_color="#ea580c", 
-            annotation_text="📢 WASPADA ROB", 
-            annotation_position="top right",
-            annotation_font_color="#ea580c",
-            annotation_font_size=12
-        )
-        
-        fig.update_layout(height=500, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True)
 
+    # --- FOOTER BUTTONS (SLIM) ---
     st.divider()
     c1, c2, c3 = st.columns(3)
-    with c1: st.download_button("📥 AWS CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "AWS.csv", use_container_width=True)
-    with c2: st.download_button("📥 Psr. Ikan CSV", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "Pasarikan.csv", use_container_width=True)
+    with c1: st.download_button("📥 AWS", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "AWS.csv", use_container_width=True)
+    with c2: st.download_button("📥 Ikan", open(FILE_HISTORY_BPBD, 'rb') if os.path.exists(FILE_HISTORY_BPBD) else "", "Ikan.csv", use_container_width=True)
     with c3: 
-        if st.button("🔄 Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
-else:
-    st.error("Gagal memuat data prediksi.")
+        if st.button("🔄 Refresh", use_container_width=True): st.cache_data.clear(); st.rerun()

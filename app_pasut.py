@@ -7,7 +7,7 @@ from streamlit_autorefresh import st_autorefresh
 import os
 import base64
 
-# --- 0. SMART AUTO REFRESH ---
+# --- 0. SMART AUTO REFRESH (Sync tiap 15 Menit) ---
 now_sync = datetime.now()
 seconds_to_next = ((15 - (now_sync.minute % 15)) * 60) - now_sync.second
 if seconds_to_next <= 0: seconds_to_next = 900
@@ -18,24 +18,27 @@ st.set_page_config(page_title="Monitoring TMA Priok", layout="wide", page_icon="
 
 st.markdown("""
     <style>
-    /* --- INI BAGIAN NGE-SCALE KALENDER --- */
-    div[data-baseweb="datepicker"] {
-        transform: scale(0.5) !important;
+    /* FIX KALENDER: Menggunakan Popover selector agar CSS tembus ke portal luar */
+    div[data-baseweb="popover"] {
+        transform: scale(0.75) !important;
         transform-origin: top left !important;
     }
 
+    /* Merapatkan container utama ke atas */
     .block-container { 
         padding-top: 0.5rem !important; 
         padding-bottom: 0rem !important; 
         max-width: 95% !important; 
     }
     
+    /* Menghilangkan gap vertikal bawaan streamlit antar elemen */
     [data-testid="stVerticalBlock"] > div {
         gap: 0px !important;
     }
 
     .stApp { background-color: #ffffff; }
     
+    /* Merapatkan Header Utama ke paling atas */
     .header-text { 
         text-align: center; 
         width: 100%; 
@@ -44,6 +47,7 @@ st.markdown("""
         padding-bottom: 0px !important;
     }
 
+    /* FIX LOGO CENTER SIDEBAR */
     [data-testid="stSidebar"] [data-testid="stImage"] {
         text-align: center !important;
         display: block !important;
@@ -59,6 +63,7 @@ st.markdown("""
         display: inline-block !important;
     }
 
+    /* GAYA METRIK (ULTRA SLIM) */
     div[data-testid="stMetric"] {
         background-color: #ffffff !important; 
         border: 1px solid #e2e8f0 !important;
@@ -91,6 +96,7 @@ st.markdown("""
 
     div[data-testid="column"] { padding: 0 5px !important; }
 
+    /* Summary Box dirapatkan ke header dengan margin negatif */
     .summary-box {
         background-color: #f1f5f9 !important; 
         padding: 8px !important; 
@@ -124,6 +130,7 @@ with st.sidebar:
         with open(NAMA_FILE_LOGO, "rb") as f:
             data = f.read()
             encoded = base64.b64encode(data).decode()
+        # MENAMBAHKAN MARGIN TOP PADA LOGO
         st.markdown(
             f"""
             <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin-top: 25px; margin-bottom: 10px;">
@@ -133,6 +140,7 @@ with st.sidebar:
             unsafe_allow_html=True
         )
     
+    # MENAMBAHKAN MARGIN TOP PADA TULISAN STASIUN
     st.markdown("<p style='text-align: center; color: #1e3a8a; margin-top: 15px; font-size: 0.85rem; font-weight: bold;'>STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>", unsafe_allow_html=True)
     st.divider()
     
@@ -207,7 +215,7 @@ live_data = {"aws": get_latest_from_csv(FILE_HISTORY_AWS), "bpbd": get_latest_fr
 if df_pred is not None and not df_pred.empty:
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
     
-    # Summary Box
+    # --- SUMMARY BOX ---
     df_h = df_pred[df_pred[col_tgl].dt.date == sekarang.date()]
     if not df_h.empty:
         idx_max = df_h[col_val].idxmax()

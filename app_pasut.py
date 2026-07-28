@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np  # <-- TAMBAHAN IMPORT UNTUK PERHITUNGAN MATEMATIKA
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import pytz
@@ -312,6 +313,126 @@ if df_pred is not None and not df_pred.empty:
         fig.update_layout(height=450, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
+
+    # =====================================================================
+    # --- FITUR TAMBAHAN: VERIFIKASI & AKURASI BULANAN ---
+    # =====================================================================
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("""
+        <div style="background-color: #1e3a8a; padding: 8px; border-radius: 8px; margin-bottom: 15px;">
+            <h4 style="color: white; margin: 0; text-align: center; font-size: 1.1rem;">📊 VERIFIKASI & AKURASI PREDIKSI BULANAN</h4>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 1. Logika Default "Bulan Sebelumnya"
+    tanggal_hari_ini_bulan_ini = sekarang.replace(day=1)
+    bulan_lalu = tanggal_hari_ini_bulan_ini - timedelta(days=1)
+    default_month_idx = bulan_lalu.month - 1
+    default_year = bulan_lalu.year
+
+    # 2. UI Pemilihan Bulan & Tahun
+    c_pilih1, c_pilih2, _ = st.columns([1, 1, 2])
+    nama_bulan_id = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+    
+    with c_pilih1:
+        selected_month_name = st.selectbox("Pilih Bulan", nama_bulan_id, index=default_month_idx)
+        selected_month = nama_bulan_id.index(selected_month_name) + 1
+    
+    with c_pilih2:
+        years = list(range(2024, sekarang.year + 2))
+        try:
+            default_year_idx = years.index(default_year)
+        except ValueError:
+            default_year_idx = 0
+        selected_year = st.selectbox("Pilih Tahun", years, index=default_year_idx)
+
+    # 3. Fungsi Resample Data ke Per-Jam
+    def prepare_hourly_data(df, time_col, val_col):
+        if df is None or df.empty:
+            return pd.DataFrame()
+        
+        # Filter berdasarkan bulan & tahun terpilih
+        df_filtered = df[(df[time_col].dt.month == selected_month) & (df[time_col].dt.year == selected_year)].copy()
+        if df_filtered.empty:
+            return pd.DataFrame()
+            
+        # Resample menjadi data rata-rata per-jam (Hourly)
+        df_filtered.set_index(time_col, inplace=True)
+        df_hourly = df_filtered.resample('1h').mean(numeric_only=True).reset_index() 
+        df_hourly.rename(columns={time_col: 'waktu', val_col: 'nilai'}, inplace=True)
+        return df_hourly.dropna()
+
+    def load_csv_for_eval(file_path):
+        if os.path.exists(file_path):
+            d = pd.read_csv(file_path)
+            d['waktu'] = pd.to_datetime(d['waktu'], format='mixed', errors='coerce')
+            return d.dropna(subset=['waktu', 'nilai'])
+        return pd.DataFrame()
+
+    # Siapkan data hourly
+    df_pred_hourly = prepare_hourly_data(df_pred.copy(), col_tgl, col_val)
+    df_aws_hourly = prepare_hourly_data(load_csv_for_eval(FILE_HISTORY_AWS), 'waktu', 'nilai')
+    df_bpbd_hourly = prepare_hourly_data(load_csv_for_eval(FILE_HISTORY_BPBD), 'waktu', 'nilai')
+    
+    def calc_monthly_metrics(pred_df, obs_df):
+        if pred_df.empty or obs_df.empty:
+            return None
+            
+        # Inner merge: hanya menghitung pada jam di mana ada prediksi DAN observasi
+        merged = pd.merge(obs_df, pred_df, on='waktu', suffixes=('_obs', '_pred')).dropna()
+        if merged.empty:
+            return None
+            
+        y_true = merged['nilai_obs']
+        y_pred = merged['nilai_pred']
+        
+        mae = np.mean(np.abs(y_true - y_pred))
+        rmse = np.sqrt(np.mean((y_true - y_pred)**2))
+        
+        # Akurasi Persentase
+        mean_true = np.mean(y_true)
+        akurasi = max(0, 100 - (mae / abs(mean_true) * 100)) if mean_true != 0 else 0
+        
+        return {"RMSE": rmse, "MAE": mae, "Akurasi": akurasi, "Count": len(merged)}
+
+    metrics_aws = calc_monthly_metrics(df_pred_hourly, df_aws_hourly)
+    metrics_bpbd = calc_monthly_metrics(df_pred_hourly, df_bpbd_hourly)
+
+    # 4. Tampilan Card Hasil Akurasi
+    c_res_aws, c_res_bpbd = st.columns(2)
+    
+    with c_res_aws:
+        st.markdown("""<div style='background-color:#f8fafc; padding:15px; border-radius:10px; border-left:5px solid #7c3aed; border: 1px solid #e2e8f0; margin-bottom: 10px;'>
+            <h5 style='color: #475569; margin-top:0;'>📡 Akurasi AWS Tj. Priok</h5>
+        </div>""", unsafe_allow_html=True)
+        
+        if metrics_aws:
+            st.metric("Total Akurasi", f"{metrics_aws['Akurasi']:.1f}%")
+            m1, m2 = st.columns(2)
+            m1.metric("RMSE", f"{metrics_aws['RMSE']:.2f} m")
+            m2.metric("MAE", f"{metrics_aws['MAE']:.2f} m")
+            st.caption(f"📌 Dihitung dari {metrics_aws['Count']} data observasi per-jam.")
+        else:
+            st.warning("Data observasi AWS tidak tersedia untuk bulan ini.")
+
+    with c_res_bpbd:
+        st.markdown("""<div style='background-color:#f8fafc; padding:15px; border-radius:10px; border-left:5px solid #f59e0b; border: 1px solid #e2e8f0; margin-bottom: 10px;'>
+            <h5 style='color: #475569; margin-top:0;'>🚪 Akurasi TMA Psr. Ikan</h5>
+        </div>""", unsafe_allow_html=True)
+        
+        if metrics_bpbd:
+            st.metric("Total Akurasi", f"{metrics_bpbd['Akurasi']:.1f}%")
+            m1, m2 = st.columns(2)
+            m1.metric("RMSE", f"{metrics_bpbd['RMSE']:.2f} m")
+            m2.metric("MAE", f"{metrics_bpbd['MAE']:.2f} m")
+            st.caption(f"📌 Dihitung dari {metrics_bpbd['Count']} data observasi per-jam.")
+        else:
+            st.warning("Data observasi Pasar Ikan tidak tersedia untuk bulan ini.")
+
+
+    # =====================================================================
+    # --- FOOTER & DOWNLOAD ---
+    # =====================================================================
     st.divider()
     c1, c2, c3 = st.columns(3)
     with c1: st.download_button("📥 AWS CSV", open(FILE_HISTORY_AWS, 'rb') if os.path.exists(FILE_HISTORY_AWS) else "", "AWS.csv", use_container_width=True)

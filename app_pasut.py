@@ -315,12 +315,17 @@ if df_pred is not None and not df_pred.empty:
 
 
     # =====================================================================
-    # --- FITUR TAMBAHAN: VERIFIKASI & AKURASI BULANAN ---
+    # --- FITUR TAMBAHAN: AKURASI BULANAN ---
     # =====================================================================
+    
+    # 3. TWEAK: Memberikan jarak renggang dan garis pembatas tegas
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.divider() # Menambahkan garis pemisah fisik bawaan Streamlit
     st.markdown("<br>", unsafe_allow_html=True)
+
     st.markdown("""
-        <div style="background-color: #1e3a8a; padding: 8px; border-radius: 8px; margin-bottom: 15px;">
-            <h4 style="color: white; margin: 0; text-align: center; font-size: 1.1rem;">📊 AKURASI PREDIKSI BULANAN</h4>
+        <div style="background-color: #1e3a8a; padding: 10px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h4 style="color: white; margin: 0; text-align: center; font-size: 1.15rem; letter-spacing: 0.5px;">📊 AKURASI PREDIKSI BULANAN</h4>
         </div>
     """, unsafe_allow_html=True)
 
@@ -330,8 +335,9 @@ if df_pred is not None and not df_pred.empty:
     default_month_idx = bulan_lalu.month - 1
     default_year = bulan_lalu.year
 
-    # 2. UI Pemilihan Bulan & Tahun
-    c_pilih1, c_pilih2, _ = st.columns([1, 1, 2])
+    # 1. TWEAK: Menengahkan UI Pemilihan Bulan & Tahun
+    # Menggunakan rasio [1, 1.5, 1.5, 1] membuang ruang kosong di kiri & kanan agar form berada di tengah
+    _, c_pilih1, c_pilih2, _ = st.columns([1, 1.5, 1.5, 1])
     nama_bulan_id = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
     
     with c_pilih1:
@@ -402,7 +408,8 @@ if df_pred is not None and not df_pred.empty:
     c_res_aws, c_res_bpbd = st.columns(2)
     
     with c_res_aws:
-        st.markdown("""<div style='background-color:#f8fafc; padding:15px; border-radius:10px; border-left:5px solid #7c3aed; border: 1px solid #e2e8f0; margin-bottom: 10px;'>
+        # Ditambahkan box-shadow agar UI card terlihat lebih profesional
+        st.markdown("""<div style='background-color:#f8fafc; padding:15px; border-radius:10px; border-left:5px solid #7c3aed; border: 1px solid #e2e8f0; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>
             <h5 style='color: #475569; margin-top:0;'>📡 Akurasi AWS Tj. Priok</h5>
         </div>""", unsafe_allow_html=True)
         
@@ -411,13 +418,14 @@ if df_pred is not None and not df_pred.empty:
             m1, m2 = st.columns(2)
             m1.metric("RMSE", f"{metrics_aws['RMSE']:.2f} m")
             m2.metric("MAE", f"{metrics_aws['MAE']:.2f} m")
-            st.caption(f"📌 Dihitung dari {metrics_aws['Count']} data observasi per-jam.")
+            st.caption(f"📌 Dihitung dari {metrics_aws['Count']} titik data observasi per-jam.")
         else:
             st.warning("Data observasi AWS tidak tersedia untuk bulan ini.")
 
     with c_res_bpbd:
-        st.markdown("""<div style='background-color:#f8fafc; padding:15px; border-radius:10px; border-left:5px solid #f59e0b; border: 1px solid #e2e8f0; margin-bottom: 10px;'>
-            <h5 style='color: #475569; margin-top:0;'>🚪 Akurasi TMA Psr. Ikan</h5>
+        # 2. TWEAK: Ikon pintu diganti 🌊 (Air) / Ditambahkan box-shadow
+        st.markdown("""<div style='background-color:#f8fafc; padding:15px; border-radius:10px; border-left:5px solid #f59e0b; border: 1px solid #e2e8f0; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>
+            <h5 style='color: #475569; margin-top:0;'>🌊 Akurasi TMA Psr. Ikan</h5>
         </div>""", unsafe_allow_html=True)
         
         if metrics_bpbd:
@@ -425,7 +433,7 @@ if df_pred is not None and not df_pred.empty:
             m1, m2 = st.columns(2)
             m1.metric("RMSE", f"{metrics_bpbd['RMSE']:.2f} m")
             m2.metric("MAE", f"{metrics_bpbd['MAE']:.2f} m")
-            st.caption(f"📌 Dihitung dari {metrics_bpbd['Count']} data observasi per-jam.")
+            st.caption(f"📌 Dihitung dari {metrics_bpbd['Count']} titik data observasi per-jam.")
         else:
             st.warning("Data observasi Pasar Ikan tidak tersedia untuk bulan ini.")
 

@@ -320,7 +320,7 @@ if df_pred is not None and not df_pred.empty:
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("""
         <div style="background-color: #1e3a8a; padding: 8px; border-radius: 8px; margin-bottom: 15px;">
-            <h4 style="color: white; margin: 0; text-align: center; font-size: 1.1rem;">📊 VERIFIKASI & AKURASI PREDIKSI BULANAN</h4>
+            <h4 style="color: white; margin: 0; text-align: center; font-size: 1.1rem;">📊 AKURASI PREDIKSI BULANAN</h4>
         </div>
     """, unsafe_allow_html=True)
 

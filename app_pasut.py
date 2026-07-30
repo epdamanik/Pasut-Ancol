@@ -313,8 +313,9 @@ if df_pred is not None and not df_pred.empty:
         fig.add_hline(y=2.5, line_dash="dash", line_color="#ef4444", annotation_text="🚨 AWAS ROB", annotation_position="top right", annotation_font_color="#ef4444", annotation_font_size=12)
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="📢 WASPADA ROB", annotation_position="top right", annotation_font_color="#ea580c", annotation_font_size=12)
         
+        # --- PERBAIKAN TYPO DI SINI ---
         # Update Tinggi Grafik ke 450 & Modebar Off
-        fig.update_layout(height=450, template="plotly_white", margin=dict(l=10, r=10, t=30 boundaries=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig.update_layout(height=450, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 

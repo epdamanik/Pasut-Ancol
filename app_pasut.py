@@ -584,8 +584,8 @@ def build_main_chart(df_pred: pd.DataFrame, col_tgl: str, col_val: str,
     )
 
     # --- 5. GARIS AMBANG BATAS ROB (Horizonatal Lines) ---
-    fig.add_hline(y=THRESHOLD_AWAS_ROB, line_dash="solid", line_color=COLOR_PALETTE["danger"], opacity=0.5, width=1)
-    fig.add_hline(y=THRESHOLD_WASPADA_ROB, line_dash="solid", line_color=COLOR_PALETTE["warning"], opacity=0.5, width=1)
+    fig.add_hline(y=THRESHOLD_AWAS_ROB, line_dash="solid", line_color=COLOR_PALETTE["danger"], opacity=0.5, line_widt=1)
+    fig.add_hline(y=THRESHOLD_WASPADA_ROB, line_dash="solid", line_color=COLOR_PALETTE["warning"], opacity=0.5, line_widt=1)
     
     # Label Ambang Batas di kanan biar gpp tumpuk data
     fig.add_annotation(x=t_end, y=THRESHOLD_AWAS_ROB, text="🚨 AWAS", showarrow=False, xanchor='right', yshift=7, font=dict(color=COLOR_PALETTE["danger"], size=10, weight='bold'), bgcolor="white")

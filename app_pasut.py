@@ -547,7 +547,7 @@ def build_main_chart(df_pred: pd.DataFrame, col_tgl: str, col_val: str,
                     connectgaps=False, # Jangan sambung klo ada bolong data
                     mode="lines",
                     line=dict(color=color_rgba, width=3, shape="spline"),
-                    hovertemplate=f"<b>{label}</b><br>Waktu: %{{x|%d %b %H:%M}}<br>Tinggi: %{{y:.2f} m<extra></extra>"
+                    hovertemplate=f"<b>{label}</b><br>Waktu: %{{x|%d %b %H:%M}}<br>Tinggi: %{{y:.2f}} m<extra></extra>"
                 ))
         except: continue
 

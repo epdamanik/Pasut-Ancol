@@ -1,3 +1,22 @@
+"""
+Dashboard Monitoring Tinggi Muka Air (TMA) Real-Time - Tanjung Priok.
+
+Aplikasi Streamlit untuk Stasiun Meteorologi Maritim Tanjung Priok (BMKG)
+yang menampilkan:
+    - Prediksi pasang surut (analisis harmonik) vs data real-time
+    - Status siaga rob (AWAS / WASPADA)
+    - Grafik timeseries interaktif dengan penanda max/min harian
+    - Evaluasi akurasi prediksi bulanan (RMSE, MAE, %Akurasi)
+    - Unduhan data historis
+
+Sumber data:
+    - prediksi_pasut_ancol_2026_FINAL_WIB.xlsx  (prediksi harmonik)
+    - history_aws_priok.csv                     (observasi AWS BMKG)
+    - history_bpbd_pasarikan.csv                (observasi Pintu Air Pasar Ikan/DSDA)
+"""
+
+from __future__ import annotations
+
 import base64
 import os
 from dataclasses import dataclass
@@ -35,7 +54,6 @@ THRESHOLD_WASPADA_ROB = 2.3
 TREN_NAIK_TURUN_TOLERANSI = 0.05
 TREN_JAM_KEDEPAN = 3
 
-# --- UPDATE PALETTE UNTUK GRAFIK LEBIH EYECATCHING ---
 COLOR_PALETTE = {
     "primary": "#1e3a8a",
     "accent": "#1e40af",
@@ -43,13 +61,9 @@ COLOR_PALETTE = {
     "warning": "#ea580c",
     "success": "#22c55e",
     "info_blue": "#3b82f6",
-    # Warna Histori dibikin sedikit lebih tebal tpi ttp transparan
-    "aws_hist": "rgba(124, 58, 237, 0.7)",    # Purple
-    "bpbd_hist": "rgba(245, 158, 11, 0.7)",   # Orange
-    # Warna Prediksi (Utama)
-    "prediksi_line": "#00d2ff",               # Cyan Neon
-    "prediksi_fill": "rgba(0, 210, 255, 0.1)",# Cyan Fill Super Transparan
-    "grid_color": "#e2e8f0",
+    "aws_hist": "rgba(124, 58, 237, 0.65)",
+    "bpbd_hist": "rgba(245, 158, 11, 0.65)",
+    "prediksi_line": "rgba(148, 163, 184, 0.7)",
 }
 
 NAMA_BULAN_ID = [
@@ -79,12 +93,6 @@ def inject_custom_css() -> None:
     st.markdown(
         f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-        
-        html, body, [class*="css"]  {{
-            font-family: 'Inter', sans-serif;
-        }}
-
         [data-baseweb="popover"] {{
             transform: scale(0.95) !important;
             transform-origin: top left !important;
@@ -103,7 +111,7 @@ def inject_custom_css() -> None:
             text-align: center;
             width: 100%;
             margin-top: -15px;
-            margin-bottom: 15px !important;
+            margin-bottom: 0px !important;
             padding-bottom: 0px !important;
         }}
 
@@ -125,57 +133,46 @@ def inject_custom_css() -> None:
             background-color: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
             border-left: 4px solid {COLOR_PALETTE['accent']} !important;
-            padding: 8px 12px !important;
-            border-radius: 10px !important;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
-            min-height: 65px !important;
+            padding: 4px 10px !important;
+            border-radius: 8px !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+            min-height: 55px !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: center !important;
         }}
         div[data-testid="stMetricLabel"] {{
             color: {COLOR_PALETTE['primary']} !important;
-            font-weight: 600 !important;
-            font-size: 0.75rem !important;
-            margin-bottom: -8px !important;
+            font-weight: 700 !important;
+            font-size: 0.7rem !important;
+            margin-bottom: -10px !important;
             white-space: nowrap !important;
         }}
         [data-testid="stMetricValue"] {{
-            font-size: 18px !important;
+            font-size: 15px !important;
             font-weight: 800 !important;
             color: #0f172a !important;
             white-space: nowrap !important;
         }}
         div[data-testid="stMetricDelta"] {{ display: none !important; }}
-        div[data-testid="column"] {{ padding: 0 7px !important; }}
+        div[data-testid="column"] {{ padding: 0 5px !important; }}
 
         .summary-box {{
             background-color: #f1f5f9 !important;
-            padding: 10px !important;
-            border-radius: 12px !important;
-            margin-top: -10px !important;
-            margin-bottom: 15px !important;
+            padding: 8px !important;
+            border-radius: 10px !important;
+            margin-top: -15px !important;
+            margin-bottom: 10px !important;
             border-left: 5px solid {COLOR_PALETTE['primary']} !important;
             text-align: center !important;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
         }}
-        .summary-text {{ font-weight: 700 !important; font-size: 0.95rem !important; color: #0f172a !important; }}
+        .summary-text {{ font-weight: 850 !important; font-size: 0.9rem !important; color: #0f172a !important; }}
 
         .footer-card {{
             margin-top: 30px; padding: 12px; border-radius: 10px;
             background-color: #f8fafc; border: 1px solid #e2e8f0;
             text-align: center;
         }}
-        
-        /* Styling untuk Plotly Chart Container agar terlihat menyatu */
-        .stPlotlyChart {{
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }}
-
         footer {{visibility: hidden;}}
         </style>
         """,
@@ -391,7 +388,7 @@ def _render_delta_metric(column, label: str, value: float, h_now: float) -> None
             <label data-testid="stMetricLabel">{label}</label>
             <div data-testid="stMetricValue">
                 {value:.2f} m
-                <span style="color: {color}; font-size: 0.85rem; font-weight: bold;">{icon} ({delta:+.2f})</span>
+                <span style="color: {color}; font-size: 0.8rem; font-weight: bold;">{icon} ({delta:+.2f})</span>
             </div>
         </div>
         """,
@@ -404,13 +401,7 @@ def render_kpi_row(df_pred: pd.DataFrame, col_tgl: str, col_val: str, h_now: flo
     """Tampilkan 4 kartu KPI: Prediksi, AWS, Pasar Ikan, dan Tren 3 jam ke depan."""
     m1, m2, m3, m4 = st.columns(4)
 
-    # Styling metric bawaan streamlit agar font lbh gede dikit
-    m1.markdown(f"""
-        <div data-testid="stMetric">
-            <label data-testid="stMetricLabel">Prediksi Pasut</label>
-            <div data-testid="stMetricValue">{h_now:.2f} m</div>
-        </div>
-    """, unsafe_allow_html=True)
+    m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
 
     if live_data["aws"] is not None:
         _render_delta_metric(m2, "AWS Tj. Priok", live_data["aws"], h_now)
@@ -426,29 +417,21 @@ def render_kpi_row(df_pred: pd.DataFrame, col_tgl: str, col_val: str, h_now: flo
     h_next = df_pred.loc[(df_pred[col_tgl] - waktu_target).abs().idxmin(), col_val]
     selisih = h_next - h_now
     if selisih > TREN_NAIK_TURUN_TOLERANSI:
-        icon, status, color = "📈", "NAIK", COLOR_PALETTE["danger"]
+        icon, status = "📈", "NAIK"
     elif selisih < -TREN_NAIK_TURUN_TOLERANSI:
-        icon, status, color = "📉", "TURUN", COLOR_PALETTE["success"]
+        icon, status = "📉", "TURUN"
     else:
-        icon, status, color = "↔️", "STAGNAN", COLOR_PALETTE["primary"]
-        
-    m4.markdown(f"""
-        <div data-testid="stMetric">
-            <label data-testid="stMetricLabel">Tren ({TREN_JAM_KEDEPAN}j Kedepan)</label>
-            <div data-testid="stMetricValue">
-                {icon} <span style="color: {color};">{status}span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+        icon, status = "↔️", "STAGNAN"
+    m4.metric(f"Tren ({TREN_JAM_KEDEPAN}j Kedepan)", f"{icon} {status}")
 
 
 # =========================================================================
-# 10. GRAFIK TIMESERIES UTAMA (UPDATE: EYECATCHING LOOK)
+# 10. GRAFIK TIMESERIES UTAMA
 # =========================================================================
 
 def build_main_chart(df_pred: pd.DataFrame, col_tgl: str, col_val: str,
                       tgl_range: tuple, sekarang_naive: datetime, sekarang: datetime) -> Optional[go.Figure]:
-    """Susun grafik prediksi vs observasi historis dengan tampilan modern, area gradient, dan neon line."""
+    """Susun grafik prediksi vs observasi historis, lengkap dengan marker max/min harian dan garis "sekarang"."""
     t_start = datetime.combine(tgl_range[0], datetime.min.time())
     t_end = datetime.combine(tgl_range[1], datetime.max.time())
 
@@ -458,194 +441,66 @@ def build_main_chart(df_pred: pd.DataFrame, col_tgl: str, col_val: str,
 
     fig = go.Figure()
 
-    # --- 1. PREDIKSI AREA WITH GRADIENT (The Eyecatching Part) ---
-    # Kita tambahin trace shadow dulu buat efek neon
     fig.add_trace(go.Scatter(
-        x=df_plot[col_tgl], 
-        y=df_plot[col_val],
-        connectgaps=True,
-        hoverinfo='skip',
-        mode='lines',
-        line=dict(color=COLOR_PALETTE["prediksi_line"], width=6, shape="spline"),
-        opacity=0.2, # Efek blur shadow
-        showlegend=False
+        x=df_plot[col_tgl], y=df_plot[col_val], name="Prediksi", mode="lines",
+        line=dict(color=COLOR_PALETTE["prediksi_line"], dash="dot", width=2, shape="spline"),
     ))
 
-    # Trace utama Prediksi (Garis Neon + Fill Area)
-    fig.add_trace(go.Scatter(
-        x=df_plot[col_tgl], 
-        y=df_plot[col_val], 
-        name="Prediksi Pasut", 
-        mode="lines",
-        # Efek Fill Area di bawah garis
-        fill='tozeroy',
-        fillcolor=COLOR_PALETTE["prediksi_fill"],
-        # Garis utama bersih
-        line=dict(color=COLOR_PALETTE["prediksi_line"], width=2.5, shape="spline"),
-        # Hover template yg lbh rapi
-        hovertemplate="<b>Prediksi</b><br>Waktu: %{x|%d %b %H:%M}<br>Tinggi: %{y:.2f} m<extra></extra>"
-    ))
-
-    # --- 2. MARKER MAX/MIN HARIAN (Sleek Look) ---
+    # Marker nilai maksimum & minimum untuk setiap hari dalam rentang
     for day in df_plot[col_tgl].dt.date.unique():
         df_day = df_plot[df_plot[col_tgl].dt.date == day]
         idx_max_p, idx_min_p = df_day[col_val].idxmax(), df_day[col_val].idxmin()
-        
-        # Puncak (Max) - Pake simbol triangle-up
         fig.add_trace(go.Scatter(
-            x=[df_day.loc[idx_max_p, col_tgl]], 
-            y=[df_day.loc[idx_max_p, col_val]],
-            mode="markers+text", 
-            name="Max Harian",
-            marker=dict(
-                color=COLOR_PALETTE["danger"], 
-                size=10, 
-                symbol='triangle-up',
-                line=dict(color='white', width=1)
-            ),
-            text=[f"{df_day.loc[idx_max_p, col_val]:.2f}"], 
-            textposition="top center", 
-            textfont=dict(family="Inter, sans-serif", size=11, color=COLOR_PALETTE["danger"], weight='bold'),
-            showlegend=False,
-            hoverinfo='skip'
+            x=[df_day.loc[idx_max_p, col_tgl]], y=[df_day.loc[idx_max_p, col_val]],
+            mode="markers+text", marker=dict(color=COLOR_PALETTE["danger"], size=8),
+            text=[f"{df_day.loc[idx_max_p, col_val]:.2f}"], textposition="top center", showlegend=False,
         ))
-        # Lembah (Min) - Pake simbol triangle-down
         fig.add_trace(go.Scatter(
-            x=[df_day.loc[idx_min_p, col_tgl]], 
-            y=[df_day.loc[idx_min_p, col_val]],
-            mode="markers+text", 
-            name="Min Harian",
-            marker=dict(
-                color=COLOR_PALETTE["info_blue"], 
-                size=10, 
-                symbol='triangle-down',
-                line=dict(color='white', width=1)
-            ),
-            text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"], 
-            textposition="bottom center", 
-            textfont=dict(family="Inter, sans-serif", size=11, color=COLOR_PALETTE["info_blue"], weight='bold'),
-            showlegend=False,
-            hoverinfo='skip'
+            x=[df_day.loc[idx_min_p, col_tgl]], y=[df_day.loc[idx_min_p, col_val]],
+            mode="markers+text", marker=dict(color=COLOR_PALETTE["info_blue"], size=8),
+            text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"], textposition="bottom center", showlegend=False,
         ))
 
-    # --- 3. DATA HISTORIS OBSERVAST (Clean Lines) ---
+    # Overlay data historis (AWS & Pasar Ikan), warna transparan agar tidak saling menutupi
     for file_path, label, color_rgba in [
-        (FILE_HISTORY_AWS, "AWS (Observasi)", COLOR_PALETTE["aws_hist"]),
-        (FILE_HISTORY_BPBD, "Pasar Ikan (Observasi)", COLOR_PALETTE["bpbd_hist"]),
+        (FILE_HISTORY_AWS, "AWS (Hist)", COLOR_PALETTE["aws_hist"]),
+        (FILE_HISTORY_BPBD, "Psr. Ikan (Hist)", COLOR_PALETTE["bpbd_hist"]),
     ]:
         if not os.path.exists(file_path):
             continue
-        try:
-            dh = pd.read_csv(file_path)
-            dh["waktu"] = pd.to_datetime(dh["waktu"], format="mixed", errors="coerce")
-            dh = dh[(dh["waktu"] >= t_start) & (dh["waktu"] <= t_end)].sort_values("waktu")
-            if not dh.empty:
-                fig.add_trace(go.Scatter(
-                    x=dh["waktu"], 
-                    y=dh["nilai"], 
-                    name=label, 
-                    connectgaps=False, # Jangan sambung klo ada bolong data
-                    mode="lines",
-                    line=dict(color=color_rgba, width=3, shape="spline"),
-                    hovertemplate=f"<b>{label}</b><br>Waktu: %{{x|%d %b %H:%M}}<br>Tinggi: %{{y:.2f}} m<extra></extra>"
-                ))
-        except: continue
+        dh = pd.read_csv(file_path)
+        dh["waktu"] = pd.to_datetime(dh["waktu"], format="mixed", errors="coerce")
+        dh = dh[(dh["waktu"] >= t_start) & (dh["waktu"] <= t_end)].sort_values("waktu")
+        if not dh.empty:
+            fig.add_trace(go.Scatter(
+                x=dh["waktu"], y=dh["nilai"], name=label, connectgaps=True, mode="lines",
+                line=dict(color=color_rgba, width=3.5, shape="spline"),
+            ))
 
-    # --- 4. INDIKATOR WAKTU SEKARANG (Vertical Line) ---
+    # Garis vertikal penanda waktu "sekarang"
     y_max_axis = df_plot[col_val].max() + 0.3
     y_min_axis = df_plot[col_val].min() - 0.2
-    
-    # Klo data historis lbh tinggi/rendah, sesuaikan axis
-    # (Logika opsional biar garis 'sekarang' ttp full atas bawah)
-
     fig.add_trace(go.Scatter(
-        x=[sekarang_naive, sekarang_naive], 
-        y=[y_min_axis, y_max_axis],
-        mode="lines", 
-        name="Waktu Sekarang",
-        line=dict(color="#000000", width=1.5, dash="dash"),
-        showlegend=False,
-        hoverinfo='skip'
+        x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis],
+        mode="lines+text", line=dict(color=COLOR_PALETTE["success"], width=2, dash="dash"),
+        text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"],
+        textposition="top center", showlegend=False,
     ))
-    
-    # Label "Sekarang" di atas garis
-    fig.add_annotation(
-        x=sekarang_naive,
-        y=y_max_axis,
-        text=f"Seketang: {sekarang.strftime('%H:%M WIB')}",
-        showarrow=False,
-        yshift=10,
-        font=dict(family="Inter, sans-serif", size=10, color="black", weight='bold'),
-        bgcolor="rgba(255, 255, 255, 0.8)",
-        bordercolor="#000000",
-        borderwidth=1,
-        borderpad=4,
-        opacity=0.9
-    )
 
-    # --- 5. GARIS AMBANG BATAS ROB (Horizonatal Lines) ---
-    fig.add_hline(y=THRESHOLD_AWAS_ROB, line_dash="solid", line_color=COLOR_PALETTE["danger"], opacity=0.5, line_widt=1)
-    fig.add_hline(y=THRESHOLD_WASPADA_ROB, line_dash="solid", line_color=COLOR_PALETTE["warning"], opacity=0.5, line_widt=1)
-    
-    # Label Ambang Batas di kanan biar gpp tumpuk data
-    fig.add_annotation(x=t_end, y=THRESHOLD_AWAS_ROB, text="🚨 AWAS", showarrow=False, xanchor='right', yshift=7, font=dict(color=COLOR_PALETTE["danger"], size=10, weight='bold'), bgcolor="white")
-    fig.add_annotation(x=t_end, y=THRESHOLD_WASPADA_ROB, text="📢 WASPADA", showarrow=False, xanchor='right', yshift=7, font=dict(color=COLOR_PALETTE["warning"], size=10, weight='bold'), bgcolor="white")
+    fig.add_hline(y=THRESHOLD_AWAS_ROB, line_dash="dash", line_color=COLOR_PALETTE["danger"],
+                  annotation_text="🚨 AWAS ROB", annotation_position="top right",
+                  annotation_font_color=COLOR_PALETTE["danger"], annotation_font_size=12)
+    fig.add_hline(y=THRESHOLD_WASPADA_ROB, line_dash="dash", line_color=COLOR_PALETTE["warning"],
+                  annotation_text="📢 WASPADA ROB", annotation_position="top right",
+                  annotation_font_color=COLOR_PALETTE["warning"], annotation_font_size=12)
 
-    # --- 6. UPDATE LAYOUT (Minimalist & Modern) ---
     fig.update_layout(
-        height=500, # Naikin dikit biar lega ada range slider
+        height=450,
         template="plotly_white",
-        margin=dict(l=10, r=10, t=10, b=10), # Margin super ketat
-        font=dict(family="Inter, sans-serif", size=12),
-        
-        # Sumbu X (Waktu)
-        xaxis=dict(
-            showgrid=True,
-            gridcolor=COLOR_PALETTE["grid_color"],
-            gridwidth=1,
-            zeroline=False,
-            tickformat="%d %b\n%H:%M",
-            title=None,
-            # TAMBAHAN: RANGE SLIDER biar keren
-            rangeslider=dict(visible=True, thickness=0.05),
-            type="date"
-        ),
-        
-        # Sumbu Y (Tinggi)
-        yaxis=dict(
-            showgrid=True,
-            gridcolor=COLOR_PALETTE["grid_color"],
-            gridwidth=1,
-            zeroline=True,
-            zerolinecolor=COLOR_PALETTE["grid_color"],
-            title=dict(text="Tinggi Air (meter)", font=dict(size=12, weight='bold')),
-            ticksuffix=" m",
-            automargin=True,
-        ),
-        
-        # Hover Label Styling
-        hoverlabel=dict(
-            bgcolor="white",
-            font_size=12,
-            font_family="Inter, sans-serif",
-            bordercolor=COLOR_PALETTE["grid_color"]
-        ),
-        
-        # Legend horizontal di atas
-        legend=dict(
-            orientation="h", 
-            yanchor="bottom", 
-            y=1.02, 
-            xanchor="right", 
-            x=1,
-            font=dict(size=11),
-            bgcolor="rgba(255,255,255,0.8)"
-        ),
-        
-        # Dragmode default zoom
-        dragmode="zoom"
+        margin=dict(l=10, r=10, t=30, b=10),
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    
     return fig
 
 
@@ -702,7 +557,7 @@ def render_accuracy_card(title: str, metrik: Optional[AkurasiMetrik], border_col
         f"""<div style='background-color:#f8fafc; padding:15px; border-radius:10px;
                 border-left:5px solid {border_color}; border: 1px solid #e2e8f0;
                 margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>
-            <h5 style='color: #475569; margin-top:0; font-weight:600;'>{title}</h5>
+            <h5 style='color: #475569; margin-top:0;'>{title}</h5>
         </div>""",
         unsafe_allow_html=True,
     )
@@ -711,14 +566,7 @@ def render_accuracy_card(title: str, metrik: Optional[AkurasiMetrik], border_col
         st.warning(f"Data observasi {nama_sumber} tidak tersedia untuk bulan ini.")
         return
 
-    # Custom styling metric akurasi
-    st.markdown(f"""
-        <div style="text-align:center; margin-bottom:15px;">
-            <div style="color:{COLOR_PALETTE['primary']}; font-size:0.8rem; font-weight:600;">Total Akurasi</div>
-            <div style="color:#0f172a; font-size:2rem; font-weight:800;">{metrik.akurasi:.1f}%</div>
-        </div>
-    """, unsafe_allow_html=True)
-
+    st.metric("Total Akurasi", f"{metrik.akurasi:.1f}%")
     col_rmse, col_mae = st.columns(2)
     col_rmse.metric("RMSE", f"{metrik.rmse:.2f} m")
     col_mae.metric("MAE", f"{metrik.mae:.2f} m")
@@ -734,10 +582,10 @@ def render_monthly_accuracy_section(df_pred: pd.DataFrame, col_tgl: str, col_val
 
     st.markdown(
         """
-        <div style="background-color: #1e3a8a; padding: 12px; border-radius: 10px;
-                    margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h4 style="color: white; margin: 0; text-align: center; font-size: 1.2rem; font-weight:700; letter-spacing: 0.5px;">
-                📊 EVALUASI AKURASI PREDIKSI BULANAN
+        <div style="background-color: #1e3a8a; padding: 10px; border-radius: 8px;
+                    margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h4 style="color: white; margin: 0; text-align: center; font-size: 1.15rem; letter-spacing: 0.5px;">
+                📊 AKURASI PREDIKSI BULANAN
             </h4>
         </div>
         """,
@@ -753,15 +601,13 @@ def render_monthly_accuracy_section(df_pred: pd.DataFrame, col_tgl: str, col_val
     _, c_pilih1, c_pilih2, _ = st.columns([1, 1.5, 1.5, 1])
 
     with c_pilih1:
-        selected_month_name = st.selectbox("Pilih Bulan Evaluasi", NAMA_BULAN_ID, index=default_month_idx)
+        selected_month_name = st.selectbox("Pilih Bulan", NAMA_BULAN_ID, index=default_month_idx)
         selected_month = NAMA_BULAN_ID.index(selected_month_name) + 1
 
     with c_pilih2:
         years = list(range(2024, sekarang.year + 2))
         default_year_idx = years.index(default_year) if default_year in years else 0
-        selected_year = st.selectbox("Pilih Tahun Evaluasi", years, index=default_year_idx)
-
-    st.markdown("<br>", unsafe_allow_html=True)
+        selected_year = st.selectbox("Pilih Tahun", years, index=default_year_idx)
 
     df_pred_hourly = prepare_hourly_data(df_pred.copy(), col_tgl, col_val, selected_month, selected_year)
     df_aws_hourly = prepare_hourly_data(
@@ -776,9 +622,9 @@ def render_monthly_accuracy_section(df_pred: pd.DataFrame, col_tgl: str, col_val
 
     c_res_aws, c_res_bpbd = st.columns(2)
     with c_res_aws:
-        render_accuracy_card("📡 Akurasi AWS Tj. Priok (BMKG)", metrics_aws, COLOR_PALETTE["aws_hist"], "AWS")
+        render_accuracy_card("📡 Akurasi AWS Tj. Priok", metrics_aws, "#7c3aed", "AWS")
     with c_res_bpbd:
-        render_accuracy_card("🌊 Akurasi TMA Psr. Ikan (DSDA)", metrics_bpbd, COLOR_PALETTE["bpbd_hist"], "Pasar Ikan")
+        render_accuracy_card("🌊 Akurasi TMA Psr. Ikan", metrics_bpbd, "#f59e0b", "Pasar Ikan")
 
 
 # =========================================================================
@@ -787,23 +633,18 @@ def render_monthly_accuracy_section(df_pred: pd.DataFrame, col_tgl: str, col_val
 
 def render_footer_downloads() -> None:
     st.divider()
-    st.markdown("<p style='text-align:center; color:#64748b; font-size:0.8rem;'>Unduh Data Historis Observasi (CSV)</p>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1,1,0.5])
+    c1, c2, c3 = st.columns(3)
 
     with c1:
-        if os.path.exists(FILE_HISTORY_AWS):
-            with open(FILE_HISTORY_AWS, "rb") as f:
-                st.download_button("📥 AWS BMKG (.csv)", f, "history_aws_priok.csv", "text/csv", use_container_width=True)
-        else: st.button("📥 AWS BMKG (Tidak Ada)", disabled=True, use_container_width=True)
+        data_aws = open(FILE_HISTORY_AWS, "rb") if os.path.exists(FILE_HISTORY_AWS) else ""
+        st.download_button("📥 AWS CSV", data_aws, "AWS.csv", use_container_width=True)
 
     with c2:
-        if os.path.exists(FILE_HISTORY_BPBD):
-            with open(FILE_HISTORY_BPBD, "rb") as f:
-                st.download_button("📥 Pasar Ikan DSDA (.csv)", f, "history_bpbd_pasarikan.csv", "text/csv", use_container_width=True)
-        else: st.button("📥 Pasar Ikan DSDA (Tidak Ada)", disabled=True, use_container_width=True)
+        data_bpbd = open(FILE_HISTORY_BPBD, "rb") if os.path.exists(FILE_HISTORY_BPBD) else ""
+        st.download_button("📥 Psr. Ikan CSV", data_bpbd, "Pasarikan.csv", use_container_width=True)
 
     with c3:
-        if st.button("🔄 Refresh", use_container_width=True):
+        if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
@@ -813,52 +654,35 @@ def render_footer_downloads() -> None:
 # =========================================================================
 
 def main() -> None:
-    # 1. Smart Refresh
     setup_smart_autorefresh()
 
-    # 2. Config & CSS
     st.set_page_config(page_title=PAGE_TITLE, layout="wide", page_icon=PAGE_ICON)
     inject_custom_css()
 
-    # 3. Time & Data Loading
     sekarang, sekarang_naive = get_current_time_jakarta()
     tgl_range = render_sidebar(sekarang)
-    
-    # 4. Render Layout Utama
     render_header()
 
-    # Klo nunggu loading data lama, kasih spinner biar pro
-    with st.spinner("Memuat data TMA..."):
-        df_pred, col_tgl, col_val = load_prediction()
-        live_data = {
-            "aws": get_latest_from_csv(FILE_HISTORY_AWS),
-            "bpbd": get_latest_from_csv(FILE_HISTORY_BPBD),
-        }
+    df_pred, col_tgl, col_val = load_prediction()
+    live_data = {
+        "aws": get_latest_from_csv(FILE_HISTORY_AWS),
+        "bpbd": get_latest_from_csv(FILE_HISTORY_BPBD),
+    }
 
-    # Error handling klo data prediksi mokat
     if df_pred is None or df_pred.empty:
-        st.error("Gagal memuat data prediksi. Pastikan file Excel tersedia.")
+        st.error("Gagal memuat data prediksi.")
         return
 
-    # Hitung nilai prediksi saat ini
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
 
-    # Komponen Atas (Status, Summary, KPI)
     render_rob_status(h_now, live_data)
     render_daily_summary_box(df_pred, col_tgl, col_val, sekarang)
     render_kpi_row(df_pred, col_tgl, col_val, h_now, live_data, sekarang_naive)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    fig = build_main_chart(df_pred, col_tgl, col_val, tgl_range, sekarang_naive, sekarang)
+    if fig is not None:
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-    # GRAFIK UTAMA (The main dish)
-    with st.container():
-        fig = build_main_chart(df_pred, col_tgl, col_val, tgl_range, sekarang_naive, sekarang)
-        if fig is not None:
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        else:
-            st.warning("Tidak ada data prediksi untuk rentang waktu yang dipilih.")
-
-    # Bagian Bawah (Akurasi, Footer)
     render_monthly_accuracy_section(df_pred, col_tgl, col_val, sekarang)
     render_footer_downloads()
 

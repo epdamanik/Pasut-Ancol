@@ -295,13 +295,17 @@ if df_pred is not None and not df_pred.empty:
             fig.add_trace(go.Scatter(x=[df_day.loc[idx_max_p, col_tgl]], y=[df_day.loc[idx_max_p, col_val]], mode='markers+text', marker=dict(color='#ef4444', size=8), text=[f"{df_day.loc[idx_max_p, col_val]:.2f}"], textposition="top center", showlegend=False))
             fig.add_trace(go.Scatter(x=[df_day.loc[idx_min_p, col_tgl]], y=[df_day.loc[idx_min_p, col_val]], mode='markers+text', marker=dict(color='#3b82f6', size=8), text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"], textposition="bottom center", showlegend=False))
 
-        for file, label, color in [(FILE_HISTORY_AWS, 'AWS (Hist)', '#7c3aed'), (FILE_HISTORY_BPBD, 'Psr. Ikan (Hist)', '#f59e0b')]:
+        # --- UPDATE: Menggunakan RGBA Transparan (Alpha 0.65) agar tidak saling menutupi ---
+        for file, label, color_rgba in [
+            (FILE_HISTORY_AWS, 'AWS (Hist)', 'rgba(124, 58, 237, 0.65)'),      # Ungu Transparan
+            (FILE_HISTORY_BPBD, 'Psr. Ikan (Hist)', 'rgba(245, 158, 11, 0.65)') # Jingga Transparan
+        ]:
             if os.path.exists(file):
                 dh = pd.read_csv(file)
                 dh['waktu'] = pd.to_datetime(dh['waktu'], format='mixed', errors='coerce')
                 dh = dh[(dh['waktu'] >= t_start) & (dh['waktu'] <= t_end)].sort_values('waktu')
                 if not dh.empty:
-                    fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, mode='lines', line=dict(color=color, width=3.5, shape='spline')))
+                    fig.add_trace(go.Scatter(x=dh['waktu'], y=dh['nilai'], name=label, connectgaps=True, mode='lines', line=dict(color=color_rgba, width=3.5, shape='spline')))
 
         y_max_axis, y_min_axis = df_plot[col_val].max() + 0.3, df_plot[col_val].min() - 0.2
         fig.add_trace(go.Scatter(x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis], mode="lines+text", line=dict(color="#22c55e", width=2, dash="dash"), text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"], textposition="top center", showlegend=False))
@@ -310,7 +314,7 @@ if df_pred is not None and not df_pred.empty:
         fig.add_hline(y=2.3, line_dash="dash", line_color="#ea580c", annotation_text="📢 WASPADA ROB", annotation_position="top right", annotation_font_color="#ea580c", annotation_font_size=12)
         
         # Update Tinggi Grafik ke 450 & Modebar Off
-        fig.update_layout(height=450, template="plotly_white", margin=dict(l=10, r=10, t=30, b=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig.update_layout(height=450, template="plotly_white", margin=dict(l=10, r=10, t=30 boundaries=10), hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 
@@ -336,7 +340,6 @@ if df_pred is not None and not df_pred.empty:
     default_year = bulan_lalu.year
 
     # 1. TWEAK: Menengahkan UI Pemilihan Bulan & Tahun
-    # Menggunakan rasio [1, 1.5, 1.5, 1] membuang ruang kosong di kiri & kanan agar form berada di tengah
     _, c_pilih1, c_pilih2, _ = st.columns([1, 1.5, 1.5, 1])
     nama_bulan_id = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
     
@@ -408,7 +411,6 @@ if df_pred is not None and not df_pred.empty:
     c_res_aws, c_res_bpbd = st.columns(2)
     
     with c_res_aws:
-        # Ditambahkan box-shadow agar UI card terlihat lebih profesional
         st.markdown("""<div style='background-color:#f8fafc; padding:15px; border-radius:10px; border-left:5px solid #7c3aed; border: 1px solid #e2e8f0; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>
             <h5 style='color: #475569; margin-top:0;'>📡 Akurasi AWS Tj. Priok</h5>
         </div>""", unsafe_allow_html=True)
@@ -423,7 +425,6 @@ if df_pred is not None and not df_pred.empty:
             st.warning("Data observasi AWS tidak tersedia untuk bulan ini.")
 
     with c_res_bpbd:
-        # 2. TWEAK: Ikon pintu diganti 🌊 (Air) / Ditambahkan box-shadow
         st.markdown("""<div style='background-color:#f8fafc; padding:15px; border-radius:10px; border-left:5px solid #f59e0b; border: 1px solid #e2e8f0; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>
             <h5 style='color: #475569; margin-top:0;'>🌊 Akurasi TMA Psr. Ikan</h5>
         </div>""", unsafe_allow_html=True)

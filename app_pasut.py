@@ -476,7 +476,7 @@ def render_header(cfg: Stasiun) -> None:
             <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.6rem;">
                 MONITORING TINGGI MUKA AIR (TMA) REAL TIME
             </h2>
-            <p style="margin: 2px 0 8px 0; color: #475569; font-size: 0.85rem; font-weight: 600;">
+            <p style="margin: -6px 0 22px 0; color: #1e3a8a; font-size: 1.15rem; font-weight: 700;">
                 📍 {cfg.nama_menu}
             </p>
         </div>

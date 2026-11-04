@@ -637,15 +637,16 @@ def build_main_chart(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl: str, col_val:
                 line=dict(color=s.warna_garis, width=3.5, shape="spline"),
             ))
 
-    # Garis vertikal penanda waktu "sekarang"
-    y_max_axis = df_plot[col_val].max() + 0.3
-    y_min_axis = df_plot[col_val].min() - 0.2
-    fig.add_trace(go.Scatter(
-        x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis],
-        mode="lines+text", line=dict(color=COLOR_PALETTE["success"], width=2, dash="dash"),
-        text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"],
-        textposition="top center", showlegend=False,
-    ))
+        # Garis vertikal penanda waktu "sekarang" (hanya jika waktu sekarang ada dalam rentang yang dipilih)
+    if t_start <= sekarang_naive <= t_end:
+        y_max_axis = df_plot[col_val].max() + 0.3
+        y_min_axis = df_plot[col_val].min() - 0.2
+        fig.add_trace(go.Scatter(
+            x=[sekarang_naive, sekarang_naive], y=[y_min_axis, y_max_axis],
+            mode="lines+text", line=dict(color=COLOR_PALETTE["success"], width=2, dash="dash"),
+            text=["", f"Sekarang: {sekarang.strftime('%d %b, %H:%M')}"],
+            textposition="top center", showlegend=False,
+        ))
 
     # Garis ambang rob (hanya jika stasiun punya ambang)
     if cfg.thr_awas is not None:

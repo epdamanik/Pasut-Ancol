@@ -621,6 +621,7 @@ def build_main_chart(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl: str, col_val:
         ))
 
     # Overlay data historis tiap sumber observasi, warna transparan agar tidak saling menutupi
+    # Overlay data historis tiap sumber observasi
     for s in cfg.sumber:
         dh = load_obs(s.file)
         if dh.empty:
@@ -628,7 +629,12 @@ def build_main_chart(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl: str, col_val:
         dh = dh[(dh["waktu"] >= t_start) & (dh["waktu"] <= t_end)]
         if not dh.empty:
             fig.add_trace(go.Scatter(
-                x=dh["waktu"], y=dh["nilai"], name=s.nama_hist, connectgaps=True, mode="lines",
+                x=dh["waktu"], 
+                y=dh["nilai"], 
+                name=s.nama_hist, 
+                connectgaps=True, 
+                mode="lines+markers",                     # <-- Tambahkan +markers di sini
+                marker=dict(size=7, color=s.warna_garis), # <-- Agar titik jam 19 & 21 langsung nongol bulatannya
                 line=dict(color=s.warna_garis, width=3.5, shape="spline"),
             ))
 

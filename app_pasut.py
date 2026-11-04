@@ -78,33 +78,33 @@ KOLOM_ALIAS_OBS = {"timestamp": "waktu", "water_level_m": "nilai"}
 @dataclass(frozen=True)
 class Sumber:
     """Satu sumber data observasi real-time (satu file CSV)."""
-    key: str               # id unik (tanpa spasi)
-    file: str              # path CSV (kolom: waktu, nilai)
-    nama_kpi: str          # label kartu KPI
-    nama_hist: str         # label di legenda grafik
-    nama_status: str       # label di banner AWAS/WASPADA
-    nama_akurasi: str      # judul kartu akurasi bulanan
-    nama_data: str         # nama singkat untuk pesan "data tidak tersedia"
-    warna_garis: str       # warna garis grafik (rgba)
-    warna_solid: str       # warna aksen kartu akurasi (hex)
-    label_unduh: str       # tulisan tombol unduh
-    nama_file_unduh: str   # nama file hasil unduhan
+    key: str                # id unik (tanpa spasi)
+    file: str               # path CSV (kolom: waktu, nilai)
+    nama_kpi: str           # label kartu KPI
+    nama_hist: str          # label di legenda grafik
+    nama_status: str        # label di banner AWAS/WASPADA
+    nama_akurasi: str       # judul kartu akurasi bulanan
+    nama_data: str          # nama singkat untuk pesan "data tidak tersedia"
+    warna_garis: str        # warna garis grafik (rgba)
+    warna_solid: str        # warna aksen kartu akurasi (hex)
+    label_unduh: str        # tulisan tombol unduh
+    nama_file_unduh: str    # nama file hasil unduhan
 
 
 @dataclass(frozen=True)
 class Stasiun:
     key: str
-    nama_menu: str                 # tampil di pilihan stasiun
-    nama_singkat: str              # untuk judul tab browser
-    nama_lengkap: str              # judul di sidebar & footer
-    file_prediksi: str             # file Excel prediksi
+    nama_menu: str                  # tampil di pilihan stasiun
+    nama_singkat: str               # untuk judul tab browser
+    nama_lengkap: str               # judul di sidebar & footer
+    file_prediksi: str              # file Excel prediksi
     sumber: tuple                  # tuple[Sumber, ...]
     thr_awas: Optional[float]      # None = stasiun ini tidak punya ambang rob
     thr_waspada: Optional[float]
-    web_label: str                 # tulisan tombol link (kosongkan jika tidak ada)
+    web_label: str                  # tulisan tombol link (kosongkan jika tidak ada)
     web_url: str
     info_prediksi: str
-    info_realtime: tuple           # tuple[str, ...]
+    info_realtime: tuple            # tuple[str, ...]
 
 
 STASIUN: dict[str, Stasiun] = {
@@ -157,13 +157,12 @@ STASIUN: dict[str, Stasiun] = {
     ),
     # ---------------------------------------------------------------------
     # CIREBON
-    # Bagian bertanda  <-- ISI  perlu disesuaikan oleh pemilik dashboard.
     # ---------------------------------------------------------------------
     "cirebon": Stasiun(
         key="cirebon",
         nama_menu="Cirebon",
         nama_singkat="Cirebon",
-        nama_lengkap="STASIUN CIREBON",                                    # <-- ISI nama resmi
+        nama_lengkap="STASIUN CIREBON",
         file_prediksi="data/cirebon/prediksi_pasut_cirebon_2026.xlsx",
         sumber=(
             Sumber(
@@ -180,11 +179,11 @@ STASIUN: dict[str, Stasiun] = {
                 nama_file_unduh="Cirebon.csv",
             ),
         ),
-        thr_awas=None,                                                     # <-- ISI ambang AWAS Cirebon (meter), None = nonaktif
-        thr_waspada=None,                                                  # <-- ISI ambang WASPADA Cirebon (meter), None = nonaktif
-        web_label="",                                                      # <-- ISI mis. "🌐 Web BMKG Cirebon" (kosong = tombol disembunyikan)
+        thr_awas=None,
+        thr_waspada=None,
+        web_label="",
         web_url="",
-        info_prediksi="Analisis Harmonik data TMA Cirebon.",              # <-- ISI sumber data prediksi
+        info_prediksi="Analisis Harmonik data TMA Cirebon.",
         info_realtime=("TMA Cirebon (Telemetri PUSHIDROSAL).",),
     ),
 }
@@ -341,13 +340,14 @@ def play_audio(file_path: str) -> None:
 def load_obs(file_path: str) -> pd.DataFrame:
     """
     Muat CSV observasi. Hasil selalu berkolom [waktu, nilai] (urut waktu).
-    Kolom ekstra (mis. station_id) dibuang. Jika file hilang/rusak -> DataFrame kosong.
+    Kolom ekstra dibuang. Jika file hilang/rusak -> DataFrame kosong.
     """
     kosong = pd.DataFrame(columns=["waktu", "nilai"])
     if not os.path.exists(file_path):
         return kosong
     try:
-        d = pd.read_csv(file_path).rename(columns=KOLOM_ALIAS_OBS)
+        # usecols=[0, 1] dan on_bad_lines="skip" mencegah ParserError jika ada kelebihan kolom
+        d = pd.read_csv(file_path, usecols=[0, 1], on_bad_lines="skip").rename(columns=KOLOM_ALIAS_OBS)
     except Exception:
         return kosong
     if not {"waktu", "nilai"}.issubset(d.columns):
@@ -492,7 +492,7 @@ def render_header(cfg: Stasiun) -> None:
 def render_rob_status(cfg: Stasiun, h_now: float, live_data: dict) -> None:
     """Cek ambang batas AWAS/WASPADA rob pada prediksi & data real-time, tampilkan banner + audio."""
     if cfg.thr_awas is None or cfg.thr_waspada is None:
-        return  # stasiun ini belum punya ambang rob
+        return
 
     check = {"Prediksi": h_now}
     for s in cfg.sumber:
@@ -589,7 +589,7 @@ def build_main_chart(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl: str, col_val:
                      tgl_range: tuple, sekarang_naive: datetime, sekarang: datetime) -> Optional[go.Figure]:
     """Susun grafik prediksi vs observasi historis, lengkap dengan marker max/min harian dan garis "sekarang"."""
     if len(tgl_range) != 2:
-        return None  # user baru memilih tanggal awal; tunggu tanggal akhir
+        return None
 
     t_start = datetime.combine(tgl_range[0], datetime.min.time())
     t_end = datetime.combine(tgl_range[1], datetime.max.time())
@@ -620,7 +620,6 @@ def build_main_chart(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl: str, col_val:
             text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"], textposition="bottom center", showlegend=False,
         ))
 
-    # Overlay data historis tiap sumber observasi, warna transparan agar tidak saling menutupi
     # Overlay data historis tiap sumber observasi
     for s in cfg.sumber:
         dh = load_obs(s.file)
@@ -633,8 +632,8 @@ def build_main_chart(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl: str, col_val:
                 y=dh["nilai"], 
                 name=s.nama_hist, 
                 connectgaps=True, 
-                mode="lines+markers",                     # <-- Tambahkan +markers di sini
-                marker=dict(size=7, color=s.warna_garis), # <-- Agar titik jam 19 & 21 langsung nongol bulatannya
+                mode="lines+markers",
+                marker=dict(size=7, color=s.warna_garis),
                 line=dict(color=s.warna_garis, width=3.5, shape="spline"),
             ))
 
@@ -776,7 +775,6 @@ def render_monthly_accuracy_section(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl
 
     df_pred_hourly = prepare_hourly_data(df_pred.copy(), col_tgl, col_val, selected_month, selected_year)
 
-    # Satu kartu per sumber observasi. Jika hanya satu sumber, taruh di tengah.
     if len(cfg.sumber) == 1:
         kolom_kartu = [st.columns([1, 2, 1])[1]]
     else:
@@ -817,7 +815,6 @@ def render_footer_downloads(cfg: Stasiun) -> None:
 # =========================================================================
 
 def main() -> None:
-    # set_page_config harus jadi perintah Streamlit pertama
     cfg_awal = STASIUN[resolve_station_key()]
     st.set_page_config(page_title=f"Monitoring TMA {cfg_awal.nama_singkat}", layout="wide", page_icon=PAGE_ICON)
 

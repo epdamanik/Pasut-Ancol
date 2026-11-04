@@ -1,21 +1,23 @@
-name: Auto Scraper TMA Priok
+name: Auto Scraper TMA Priok & Cirebon
 
 on:
-  # Kita hapus cron bawaan karena sering ngaret (jam karet)
-  # Sekarang pemicu utamanya adalah API dari Google Apps Script
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# Cegah GAS men-trigger 2 workflow bersamaan jika ada double click / repeat trigger
+concurrency:
+  group: scraper-tma-group
+  cancel-in-progress: false
+
 jobs:
-  scrape-data:
+  scrape-and-push:
     runs-on: ubuntu-latest
-    
-    # Menghilangkan warning Node.js agar log lebih bersih
+
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -23,21 +25,44 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
       - name: Install Dependencies
         run: |
-          pip install selenium webdriver-manager pandas pytz openpyxl
+          pip install --upgrade pip
+          pip install selenium webdriver-manager pandas pytz openpyxl requests
 
-      - name: Eksekusi Background Scraper
-        run: python scraper_khusus.py 
+      # continue-on-error: true berguna agar jika server salah satu stasiun down/timeout,
+      # stasiun yang satu lagi tetap jalan dan datanya tetap tersimpan.
+      - name: Eksekusi Scraper Priok
+        continue-on-error: true
+        run: python scraper_khusus.py
 
-      - name: Commit dan Push Hasil CSV ke Repo
+      - name: Eksekusi Scraper Cirebon
+        continue-on-error: true
+        run: python scraper_cirebon.py
+
+      - name: Commit dan Push Hasil ke Repo
         run: |
           git config --global user.name "Bot-Stamar-Priok"
           git config --global user.email "bot@github.com"
-          # Menambahkan file CSV hasil scraping
+
+          # Stage file output dari kedua scraper
           git add history_aws_priok.csv history_bpbd_pasarikan.csv
-          # Commit hanya jika ada perubahan data, [skip ci] agar tidak trigger loop
-          git commit -m "Auto-update data TMA [skip ci]" || exit 0
-          git push
+          
+          # Stage file Cirebon jika filenya ada
+          if [ -f "data/cirebon/history_pushidrosal_cirebon.csv" ]; then
+            git add data/cirebon/history_pushidrosal_cirebon.csv
+          fi
+
+          # Cek apakah ada perubahan yang siap di-commit
+          if git diff --cached --quiet; then
+            echo "Tidak ada perubahan data baru. Skip commit."
+            exit 0
+          fi
+
+          git commit -m "Auto-update data TMA Priok & Cirebon [skip ci]"
+          
+          # Tarik perubahan remote terlebih dahulu sebagai jaminan sebelum push
+          git pull --rebase origin main
+          git push origin main

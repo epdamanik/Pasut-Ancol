@@ -4,7 +4,7 @@ on:
   schedule:
     # Menit ke-7 tiap jam (UTC, tapi karena tiap jam jadi sama saja di WIB).
     # Jendela data skrip: jam bulat +-5 menit, jadi harus jalan SETELAH menit :05.
-    - cron: "7 * * * *"
+   
   workflow_dispatch:   # tombol "Run workflow" manual untuk testing
 
 permissions:

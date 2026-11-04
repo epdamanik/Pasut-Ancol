@@ -1,18 +1,20 @@
 """
-Dashboard Monitoring Tinggi Muka Air (TMA) Real-Time - Tanjung Priok.
+Dashboard Monitoring Tinggi Muka Air (TMA) Real-Time - Multi Stasiun.
 
-Aplikasi Streamlit untuk Stasiun Meteorologi Maritim Tanjung Priok (BMKG)
-yang menampilkan:
+Stasiun yang tersedia (pilih lewat sidebar):
+    - Tanjung Priok  (prediksi harmonik + AWS BMKG + Pintu Air Pasar Ikan/DSDA)
+    - Cirebon        (prediksi harmonik + telemetri PUSHIDROSAL)
+
+Fitur (sama untuk semua stasiun):
     - Prediksi pasang surut (analisis harmonik) vs data real-time
-    - Status siaga rob (AWAS / WASPADA)
+    - Status siaga rob (AWAS / WASPADA) -> hanya aktif jika ambang batas stasiun diisi
     - Grafik timeseries interaktif dengan penanda max/min harian
     - Evaluasi akurasi prediksi bulanan (RMSE, MAE, %Akurasi)
     - Unduhan data historis
 
-Sumber data:
-    - prediksi_pasut_ancol_2026_FINAL_WIB.xlsx  (prediksi harmonik)
-    - history_aws_priok.csv                     (observasi AWS BMKG)
-    - history_bpbd_pasarikan.csv                (observasi Pintu Air Pasar Ikan/DSDA)
+CARA MENAMBAH STASIUN BARU:
+    Cukup tambahkan satu entri di dictionary STASIUN (bagian 1B). Tidak perlu
+    mengubah fungsi lain.
 """
 
 from __future__ import annotations
@@ -31,24 +33,16 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 # =========================================================================
-# 1. KONSTANTA & KONFIGURASI GLOBAL
+# 1A. KONSTANTA GLOBAL (berlaku untuk semua stasiun)
 # =========================================================================
 
-PAGE_TITLE = "Monitoring TMA Priok"
 PAGE_ICON = "🌊"
 TIMEZONE = "Asia/Jakarta"
 AUTO_REFRESH_INTERVAL_MIN = 15
 
 FILE_LOGO = "logo-bmkg-transparan.png"
-FILE_PREDIKSI = "prediksi_pasut_ancol_2026_FINAL_WIB.xlsx"
-FILE_HISTORY_AWS = "history_aws_priok.csv"
-FILE_HISTORY_BPBD = "history_bpbd_pasarikan.csv"
 FILE_AUDIO_AWAS = "AWAS ROB.mp3"
 FILE_AUDIO_WASPADA = "waspada ROB.mp3"
-
-# Ambang batas siaga rob (dalam meter)
-THRESHOLD_AWAS_ROB = 2.5
-THRESHOLD_WASPADA_ROB = 2.3
 
 # Toleransi perubahan (meter) untuk menentukan status tren
 TREN_NAIK_TURUN_TOLERANSI = 0.05
@@ -63,6 +57,7 @@ COLOR_PALETTE = {
     "info_blue": "#3b82f6",
     "aws_hist": "rgba(124, 58, 237, 0.65)",
     "bpbd_hist": "rgba(245, 158, 11, 0.65)",
+    "cirebon_hist": "rgba(16, 185, 129, 0.65)",
     "prediksi_line": "rgba(148, 163, 184, 0.7)",
 }
 
@@ -70,6 +65,137 @@ NAMA_BULAN_ID = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ]
+
+# Nama kolom CSV observasi yang diterima (alias -> nama standar).
+# Jadi CSV hasil skrip lama (timestamp, water_level_m) pun tetap terbaca.
+KOLOM_ALIAS_OBS = {"timestamp": "waktu", "water_level_m": "nilai"}
+
+
+# =========================================================================
+# 1B. REGISTRY STASIUN  <-- TAMBAH / UBAH STASIUN DI SINI
+# =========================================================================
+
+@dataclass(frozen=True)
+class Sumber:
+    """Satu sumber data observasi real-time (satu file CSV)."""
+    key: str               # id unik (tanpa spasi)
+    file: str              # path CSV (kolom: waktu, nilai)
+    nama_kpi: str          # label kartu KPI
+    nama_hist: str         # label di legenda grafik
+    nama_status: str       # label di banner AWAS/WASPADA
+    nama_akurasi: str      # judul kartu akurasi bulanan
+    nama_data: str         # nama singkat untuk pesan "data tidak tersedia"
+    warna_garis: str       # warna garis grafik (rgba)
+    warna_solid: str       # warna aksen kartu akurasi (hex)
+    label_unduh: str       # tulisan tombol unduh
+    nama_file_unduh: str   # nama file hasil unduhan
+
+
+@dataclass(frozen=True)
+class Stasiun:
+    key: str
+    nama_menu: str                 # tampil di pilihan stasiun
+    nama_singkat: str              # untuk judul tab browser
+    nama_lengkap: str              # judul di sidebar & footer
+    file_prediksi: str             # file Excel prediksi
+    sumber: tuple                  # tuple[Sumber, ...]
+    thr_awas: Optional[float]      # None = stasiun ini tidak punya ambang rob
+    thr_waspada: Optional[float]
+    web_label: str                 # tulisan tombol link (kosongkan jika tidak ada)
+    web_url: str
+    info_prediksi: str
+    info_realtime: tuple           # tuple[str, ...]
+
+
+STASIUN: dict[str, Stasiun] = {
+    # ---------------------------------------------------------------------
+    # TANJUNG PRIOK  (konfigurasi lama, tidak berubah)
+    # ---------------------------------------------------------------------
+    "priok": Stasiun(
+        key="priok",
+        nama_menu="Tanjung Priok",
+        nama_singkat="Priok",
+        nama_lengkap="STASIUN METEOROLOGI MARITIM TANJUNG PRIOK",
+        file_prediksi="prediksi_pasut_ancol_2026_FINAL_WIB.xlsx",
+        sumber=(
+            Sumber(
+                key="aws",
+                file="history_aws_priok.csv",
+                nama_kpi="AWS Tj. Priok",
+                nama_hist="AWS (Hist)",
+                nama_status="AWS",
+                nama_akurasi="📡 Akurasi AWS Tj. Priok",
+                nama_data="AWS",
+                warna_garis=COLOR_PALETTE["aws_hist"],
+                warna_solid="#7c3aed",
+                label_unduh="📥 AWS CSV",
+                nama_file_unduh="AWS.csv",
+            ),
+            Sumber(
+                key="bpbd",
+                file="history_bpbd_pasarikan.csv",
+                nama_kpi="TMA Psr. Ikan",
+                nama_hist="Psr. Ikan (Hist)",
+                nama_status="PASAR IKAN",
+                nama_akurasi="🌊 Akurasi TMA Psr. Ikan",
+                nama_data="Pasar Ikan",
+                warna_garis=COLOR_PALETTE["bpbd_hist"],
+                warna_solid="#f59e0b",
+                label_unduh="📥 Psr. Ikan CSV",
+                nama_file_unduh="Pasarikan.csv",
+            ),
+        ),
+        thr_awas=2.5,
+        thr_waspada=2.3,
+        web_label="🌐 Web BMKG Tanjung Priok",
+        web_url="https://bmkgtanjungpriok.info/",
+        info_prediksi="Analisis Harmonik data TMA Pasar Ikan I (DSDA) Tahun 2025.",
+        info_realtime=(
+            "AWS Maritim Tanjung Priok (BMKG).",
+            "Pintu Air Pasar Ikan I (DSDA).",
+        ),
+    ),
+    # ---------------------------------------------------------------------
+    # CIREBON
+    # Bagian bertanda  <-- ISI  perlu disesuaikan oleh pemilik dashboard.
+    # ---------------------------------------------------------------------
+    "cirebon": Stasiun(
+        key="cirebon",
+        nama_menu="Cirebon",
+        nama_singkat="Cirebon",
+        nama_lengkap="STASIUN CIREBON",                                    # <-- ISI nama resmi
+        file_prediksi="data/cirebon/prediksi_pasut_cirebon_2026.xlsx",
+        sumber=(
+            Sumber(
+                key="pushidrosal",
+                file="data/cirebon/history_pushidrosal_cirebon.csv",
+                nama_kpi="TMA Cirebon",
+                nama_hist="TMA Cirebon (Hist)",
+                nama_status="CIREBON",
+                nama_akurasi="🌊 Akurasi TMA Cirebon",
+                nama_data="Cirebon",
+                warna_garis=COLOR_PALETTE["cirebon_hist"],
+                warna_solid="#10b981",
+                label_unduh="📥 Cirebon CSV",
+                nama_file_unduh="Cirebon.csv",
+            ),
+        ),
+        thr_awas=None,                                                     # <-- ISI ambang AWAS Cirebon (meter), None = nonaktif
+        thr_waspada=None,                                                  # <-- ISI ambang WASPADA Cirebon (meter), None = nonaktif
+        web_label="",                                                      # <-- ISI mis. "🌐 Web BMKG Cirebon" (kosong = tombol disembunyikan)
+        web_url="",
+        info_prediksi="Analisis Harmonik data TMA Cirebon.",              # <-- ISI sumber data prediksi
+        info_realtime=("TMA Cirebon (Telemetri PUSHIDROSAL).",),
+    ),
+}
+
+DEFAULT_STASIUN = "priok"
+
+
+def resolve_station_key() -> str:
+    """Tentukan stasiun aktif: pilihan terakhir user > parameter URL (?stasiun=...) > default."""
+    key = st.session_state.get("stasiun_key") or st.query_params.get("stasiun", DEFAULT_STASIUN)
+    return key if key in STASIUN else DEFAULT_STASIUN
 
 
 # =========================================================================
@@ -211,49 +337,59 @@ def play_audio(file_path: str) -> None:
 # 6. DATA LOADING
 # =========================================================================
 
+@st.cache_data(ttl=60)
+def load_obs(file_path: str) -> pd.DataFrame:
+    """
+    Muat CSV observasi. Hasil selalu berkolom [waktu, nilai] (urut waktu).
+    Kolom ekstra (mis. station_id) dibuang. Jika file hilang/rusak -> DataFrame kosong.
+    """
+    kosong = pd.DataFrame(columns=["waktu", "nilai"])
+    if not os.path.exists(file_path):
+        return kosong
+    try:
+        d = pd.read_csv(file_path).rename(columns=KOLOM_ALIAS_OBS)
+    except Exception:
+        return kosong
+    if not {"waktu", "nilai"}.issubset(d.columns):
+        return kosong
+
+    d["waktu"] = pd.to_datetime(d["waktu"], format="mixed", errors="coerce")
+    d["nilai"] = pd.to_numeric(d["nilai"], errors="coerce")
+    d = d.dropna(subset=["waktu", "nilai"])[["waktu", "nilai"]]
+    return d.sort_values("waktu").reset_index(drop=True)
+
+
 def get_latest_from_csv(file_path: str) -> Optional[float]:
     """Ambil nilai observasi terakhir (paling baru) dari berkas CSV histori."""
-    if not os.path.exists(file_path):
+    d = load_obs(file_path)
+    if d.empty:
         return None
-    try:
-        df = pd.read_csv(file_path)
-        df["waktu"] = pd.to_datetime(df["waktu"], format="mixed", errors="coerce")
-        return df.dropna(subset=["waktu", "nilai"]).sort_values("waktu").iloc[-1]["nilai"]
-    except Exception:
-        return None
-
-
-def load_csv_for_eval(file_path: str) -> pd.DataFrame:
-    """Muat CSV histori untuk keperluan evaluasi akurasi bulanan."""
-    if not os.path.exists(file_path):
-        return pd.DataFrame()
-    d = pd.read_csv(file_path)
-    d["waktu"] = pd.to_datetime(d["waktu"], format="mixed", errors="coerce")
-    return d.dropna(subset=["waktu", "nilai"])
+    return float(d.iloc[-1]["nilai"])
 
 
 @st.cache_data(ttl=3600)
-def load_prediction() -> tuple[Optional[pd.DataFrame], Optional[str], Optional[str]]:
+def load_prediction(file_path: str) -> tuple[Optional[pd.DataFrame], Optional[str], Optional[str]]:
     """Muat data prediksi pasut dari Excel dan deteksi otomatis nama kolom waktu/nilai."""
-    if not os.path.exists(FILE_PREDIKSI):
+    if not os.path.exists(file_path):
         return None, None, None
 
-    df = pd.read_excel(FILE_PREDIKSI, engine="openpyxl")
+    df = pd.read_excel(file_path, engine="openpyxl")
     t_col = next((c for c in ["tanggal_prediksi", "Waktu_WIB", "Waktu"] if c in df.columns), None)
     v_col = next((c for c in ["wl_prediksi", "Tinggi_Navigasi_m"] if c in df.columns), None)
+    if t_col is None or v_col is None:
+        return None, None, None
 
-    if t_col:
-        df[t_col] = pd.to_datetime(df[t_col], format="mixed", errors="coerce")
-
-    return df.dropna(subset=[t_col, v_col]).sort_values(t_col), t_col, v_col
+    df[t_col] = pd.to_datetime(df[t_col], format="mixed", errors="coerce")
+    df[v_col] = pd.to_numeric(df[v_col], errors="coerce")
+    return df.dropna(subset=[t_col, v_col]).sort_values(t_col).reset_index(drop=True), t_col, v_col
 
 
 # =========================================================================
 # 7. SIDEBAR
 # =========================================================================
 
-def render_sidebar(sekarang: datetime) -> tuple:
-    """Render sidebar (logo, judul stasiun, filter tanggal, info sumber data, footer)."""
+def render_sidebar(sekarang: datetime) -> tuple[Stasiun, tuple]:
+    """Render sidebar (logo, pilihan stasiun, filter tanggal, info sumber data, footer)."""
     with st.sidebar:
         if os.path.exists(FILE_LOGO):
             with open(FILE_LOGO, "rb") as f:
@@ -268,10 +404,23 @@ def render_sidebar(sekarang: datetime) -> tuple:
                 unsafe_allow_html=True,
             )
 
+        # ---- Pilihan stasiun ----
+        if "stasiun_key" not in st.session_state:
+            st.session_state["stasiun_key"] = resolve_station_key()
+        pilih = st.selectbox(
+            "📍 Pilih Stasiun",
+            list(STASIUN.keys()),
+            format_func=lambda k: STASIUN[k].nama_menu,
+            key="stasiun_key",
+        )
+        cfg = STASIUN[pilih]
+        # Simpan ke URL supaya link bisa dibagikan (?stasiun=cirebon)
+        if st.query_params.get("stasiun") != pilih:
+            st.query_params["stasiun"] = pilih
+
         st.markdown(
-            "<p style='text-align: center; color: #1e3a8a; margin-top: 15px; "
-            "font-size: 0.85rem; font-weight: bold;'>"
-            "STASIUN METEOROLOGI MARITIM TANJUNG PRIOK</p>",
+            f"<p style='text-align: center; color: #1e3a8a; margin-top: 15px; "
+            f"font-size: 0.85rem; font-weight: bold;'>{cfg.nama_lengkap}</p>",
             unsafe_allow_html=True,
         )
         st.divider()
@@ -280,21 +429,22 @@ def render_sidebar(sekarang: datetime) -> tuple:
             "🗓️ Rentang Waktu Grafik",
             value=(sekarang.date() - timedelta(days=1), sekarang.date() + timedelta(days=2)),
         )
-        st.link_button("🌐 Web BMKG Tanjung Priok", "https://bmkgtanjungpriok.info/", use_container_width=True)
+        if cfg.web_url and cfg.web_label:
+            st.link_button(cfg.web_label, cfg.web_url, use_container_width=True)
 
         with st.expander("ℹ️ Info Sumber Data"):
+            daftar_realtime = "".join(f"<li>{item}</li>" for item in cfg.info_realtime)
             st.markdown(
-                """
+                f"""
                 <div style="text-align: justify; font-size: 0.95rem; color: #475569;">
                     <strong>📍 Prediksi:</strong><br>
-                    Analisis Harmonik data TMA Pasar Ikan I (DSDA) Tahun 2025.
+                    {cfg.info_prediksi}
                 </div>
                 <br>
                 <div style="text-align: justify; font-size: 0.95rem; color: #475569;">
                     <strong>⚡ Real-time:</strong>
                     <ul style="margin-top: 5px; padding-left: 20px;">
-                        <li>AWS Maritim Tanjung Priok (BMKG).</li>
-                        <li>Pintu Air Pasar Ikan I (DSDA).</li>
+                        {daftar_realtime}
                     </ul>
                 </div>
                 """,
@@ -302,10 +452,10 @@ def render_sidebar(sekarang: datetime) -> tuple:
             )
 
         st.markdown(
-            """
+            f"""
             <div class="footer-card">
                 <p style='font-size: 0.72rem; color: #1e3a8a; margin-bottom: 0; font-weight: 600;'>
-                    © 2026 Stasiun Meteorologi Maritim Tanjung Priok
+                    © 2026 {cfg.nama_lengkap.title()}
                 </p>
             </div>
             <div style="text-align: center; margin-top: 15px; line-height: 1;">
@@ -316,16 +466,19 @@ def render_sidebar(sekarang: datetime) -> tuple:
             unsafe_allow_html=True,
         )
 
-    return tgl_range
+    return cfg, tgl_range
 
 
-def render_header() -> None:
+def render_header(cfg: Stasiun) -> None:
     st.markdown(
-        """
+        f"""
         <div class="header-text">
             <h2 style="margin: 0; color: #0f172a; font-weight: bold; font-size: 1.6rem;">
                 MONITORING TINGGI MUKA AIR (TMA) REAL TIME
             </h2>
+            <p style="margin: 2px 0 8px 0; color: #475569; font-size: 0.85rem; font-weight: 600;">
+                📍 {cfg.nama_menu}
+            </p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -336,11 +489,17 @@ def render_header() -> None:
 # 8. STATUS SIAGA ROB
 # =========================================================================
 
-def render_rob_status(h_now: float, live_data: dict) -> None:
+def render_rob_status(cfg: Stasiun, h_now: float, live_data: dict) -> None:
     """Cek ambang batas AWAS/WASPADA rob pada prediksi & data real-time, tampilkan banner + audio."""
-    check = {"Prediksi": h_now, "AWS": live_data["aws"], "PASAR IKAN": live_data["bpbd"]}
-    awas = [n for n, v in check.items() if v and v >= THRESHOLD_AWAS_ROB]
-    waspada = [n for n, v in check.items() if v and THRESHOLD_WASPADA_ROB <= v < THRESHOLD_AWAS_ROB]
+    if cfg.thr_awas is None or cfg.thr_waspada is None:
+        return  # stasiun ini belum punya ambang rob
+
+    check = {"Prediksi": h_now}
+    for s in cfg.sumber:
+        check[s.nama_status] = live_data.get(s.key)
+
+    awas = [n for n, v in check.items() if v is not None and v >= cfg.thr_awas]
+    waspada = [n for n, v in check.items() if v is not None and cfg.thr_waspada <= v < cfg.thr_awas]
 
     if awas:
         st.error(f"🚨 STATUS: AWAS ROB! ({', '.join(awas)})", icon="⚠️")
@@ -396,22 +555,19 @@ def _render_delta_metric(column, label: str, value: float, h_now: float) -> None
     )
 
 
-def render_kpi_row(df_pred: pd.DataFrame, col_tgl: str, col_val: str, h_now: float,
-                    live_data: dict, sekarang_naive: datetime) -> None:
-    """Tampilkan 4 kartu KPI: Prediksi, AWS, Pasar Ikan, dan Tren 3 jam ke depan."""
-    m1, m2, m3, m4 = st.columns(4)
+def render_kpi_row(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl: str, col_val: str, h_now: float,
+                   live_data: dict, sekarang_naive: datetime) -> None:
+    """Kartu KPI: Prediksi, satu kartu per sumber observasi, dan Tren beberapa jam ke depan."""
+    cols = st.columns(len(cfg.sumber) + 2)
 
-    m1.metric("Prediksi Pasut", f"{h_now:.2f} m")
+    cols[0].metric("Prediksi Pasut", f"{h_now:.2f} m")
 
-    if live_data["aws"] is not None:
-        _render_delta_metric(m2, "AWS Tj. Priok", live_data["aws"], h_now)
-    else:
-        m2.metric("AWS Tj. Priok", "N/A")
-
-    if live_data["bpbd"] is not None:
-        _render_delta_metric(m3, "TMA Psr. Ikan", live_data["bpbd"], h_now)
-    else:
-        m3.metric("TMA Psr. Ikan", "N/A")
+    for col, s in zip(cols[1:-1], cfg.sumber):
+        nilai = live_data.get(s.key)
+        if nilai is not None:
+            _render_delta_metric(col, s.nama_kpi, nilai, h_now)
+        else:
+            col.metric(s.nama_kpi, "N/A")
 
     waktu_target = sekarang_naive + timedelta(hours=TREN_JAM_KEDEPAN)
     h_next = df_pred.loc[(df_pred[col_tgl] - waktu_target).abs().idxmin(), col_val]
@@ -422,16 +578,19 @@ def render_kpi_row(df_pred: pd.DataFrame, col_tgl: str, col_val: str, h_now: flo
         icon, status = "📉", "TURUN"
     else:
         icon, status = "↔️", "STAGNAN"
-    m4.metric(f"Tren ({TREN_JAM_KEDEPAN}j Kedepan)", f"{icon} {status}")
+    cols[-1].metric(f"Tren ({TREN_JAM_KEDEPAN}j Kedepan)", f"{icon} {status}")
 
 
 # =========================================================================
 # 10. GRAFIK TIMESERIES UTAMA
 # =========================================================================
 
-def build_main_chart(df_pred: pd.DataFrame, col_tgl: str, col_val: str,
-                      tgl_range: tuple, sekarang_naive: datetime, sekarang: datetime) -> Optional[go.Figure]:
+def build_main_chart(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl: str, col_val: str,
+                     tgl_range: tuple, sekarang_naive: datetime, sekarang: datetime) -> Optional[go.Figure]:
     """Susun grafik prediksi vs observasi historis, lengkap dengan marker max/min harian dan garis "sekarang"."""
+    if len(tgl_range) != 2:
+        return None  # user baru memilih tanggal awal; tunggu tanggal akhir
+
     t_start = datetime.combine(tgl_range[0], datetime.min.time())
     t_end = datetime.combine(tgl_range[1], datetime.max.time())
 
@@ -461,20 +620,16 @@ def build_main_chart(df_pred: pd.DataFrame, col_tgl: str, col_val: str,
             text=[f"{df_day.loc[idx_min_p, col_val]:.2f}"], textposition="bottom center", showlegend=False,
         ))
 
-    # Overlay data historis (AWS & Pasar Ikan), warna transparan agar tidak saling menutupi
-    for file_path, label, color_rgba in [
-        (FILE_HISTORY_AWS, "AWS (Hist)", COLOR_PALETTE["aws_hist"]),
-        (FILE_HISTORY_BPBD, "Psr. Ikan (Hist)", COLOR_PALETTE["bpbd_hist"]),
-    ]:
-        if not os.path.exists(file_path):
+    # Overlay data historis tiap sumber observasi, warna transparan agar tidak saling menutupi
+    for s in cfg.sumber:
+        dh = load_obs(s.file)
+        if dh.empty:
             continue
-        dh = pd.read_csv(file_path)
-        dh["waktu"] = pd.to_datetime(dh["waktu"], format="mixed", errors="coerce")
-        dh = dh[(dh["waktu"] >= t_start) & (dh["waktu"] <= t_end)].sort_values("waktu")
+        dh = dh[(dh["waktu"] >= t_start) & (dh["waktu"] <= t_end)]
         if not dh.empty:
             fig.add_trace(go.Scatter(
-                x=dh["waktu"], y=dh["nilai"], name=label, connectgaps=True, mode="lines",
-                line=dict(color=color_rgba, width=3.5, shape="spline"),
+                x=dh["waktu"], y=dh["nilai"], name=s.nama_hist, connectgaps=True, mode="lines",
+                line=dict(color=s.warna_garis, width=3.5, shape="spline"),
             ))
 
     # Garis vertikal penanda waktu "sekarang"
@@ -487,12 +642,15 @@ def build_main_chart(df_pred: pd.DataFrame, col_tgl: str, col_val: str,
         textposition="top center", showlegend=False,
     ))
 
-    fig.add_hline(y=THRESHOLD_AWAS_ROB, line_dash="dash", line_color=COLOR_PALETTE["danger"],
-                  annotation_text="🚨 AWAS ROB", annotation_position="top right",
-                  annotation_font_color=COLOR_PALETTE["danger"], annotation_font_size=12)
-    fig.add_hline(y=THRESHOLD_WASPADA_ROB, line_dash="dash", line_color=COLOR_PALETTE["warning"],
-                  annotation_text="📢 WASPADA ROB", annotation_position="top right",
-                  annotation_font_color=COLOR_PALETTE["warning"], annotation_font_size=12)
+    # Garis ambang rob (hanya jika stasiun punya ambang)
+    if cfg.thr_awas is not None:
+        fig.add_hline(y=cfg.thr_awas, line_dash="dash", line_color=COLOR_PALETTE["danger"],
+                      annotation_text="🚨 AWAS ROB", annotation_position="top right",
+                      annotation_font_color=COLOR_PALETTE["danger"], annotation_font_size=12)
+    if cfg.thr_waspada is not None:
+        fig.add_hline(y=cfg.thr_waspada, line_dash="dash", line_color=COLOR_PALETTE["warning"],
+                      annotation_text="📢 WASPADA ROB", annotation_position="top right",
+                      annotation_font_color=COLOR_PALETTE["warning"], annotation_font_size=12)
 
     fig.update_layout(
         height=450,
@@ -517,12 +675,13 @@ class AkurasiMetrik:
 
 
 def prepare_hourly_data(df: pd.DataFrame, time_col: str, val_col: str,
-                         bulan: int, tahun: int) -> pd.DataFrame:
+                        bulan: int, tahun: int) -> pd.DataFrame:
     """Filter data ke bulan/tahun terpilih lalu resample menjadi rata-rata per-jam."""
     if df is None or df.empty:
         return pd.DataFrame()
 
-    df_filtered = df[(df[time_col].dt.month == bulan) & (df[time_col].dt.year == tahun)].copy()
+    df_filtered = df[(df[time_col].dt.month == bulan) & (df[time_col].dt.year == tahun)]
+    df_filtered = df_filtered[[time_col, val_col]].copy()
     if df_filtered.empty:
         return pd.DataFrame()
 
@@ -552,7 +711,7 @@ def calc_monthly_metrics(pred_df: pd.DataFrame, obs_df: pd.DataFrame) -> Optiona
 
 
 def render_accuracy_card(title: str, metrik: Optional[AkurasiMetrik], border_color: str,
-                          nama_sumber: str) -> None:
+                         nama_sumber: str) -> None:
     st.markdown(
         f"""<div style='background-color:#f8fafc; padding:15px; border-radius:10px;
                 border-left:5px solid {border_color}; border: 1px solid #e2e8f0;
@@ -573,9 +732,9 @@ def render_accuracy_card(title: str, metrik: Optional[AkurasiMetrik], border_col
     st.caption(f"📌 Dihitung dari {metrik.jumlah_data} titik data observasi per-jam.")
 
 
-def render_monthly_accuracy_section(df_pred: pd.DataFrame, col_tgl: str, col_val: str,
-                                     sekarang: datetime) -> None:
-    """Render seluruh bagian evaluasi akurasi prediksi bulanan (pemilih bulan + 2 kartu hasil)."""
+def render_monthly_accuracy_section(cfg: Stasiun, df_pred: pd.DataFrame, col_tgl: str, col_val: str,
+                                    sekarang: datetime) -> None:
+    """Render seluruh bagian evaluasi akurasi prediksi bulanan (pemilih bulan + kartu hasil per sumber)."""
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.divider()
     st.markdown("<br>", unsafe_allow_html=True)
@@ -610,40 +769,38 @@ def render_monthly_accuracy_section(df_pred: pd.DataFrame, col_tgl: str, col_val
         selected_year = st.selectbox("Pilih Tahun", years, index=default_year_idx)
 
     df_pred_hourly = prepare_hourly_data(df_pred.copy(), col_tgl, col_val, selected_month, selected_year)
-    df_aws_hourly = prepare_hourly_data(
-        load_csv_for_eval(FILE_HISTORY_AWS), "waktu", "nilai", selected_month, selected_year
-    )
-    df_bpbd_hourly = prepare_hourly_data(
-        load_csv_for_eval(FILE_HISTORY_BPBD), "waktu", "nilai", selected_month, selected_year
-    )
 
-    metrics_aws = calc_monthly_metrics(df_pred_hourly, df_aws_hourly)
-    metrics_bpbd = calc_monthly_metrics(df_pred_hourly, df_bpbd_hourly)
+    # Satu kartu per sumber observasi. Jika hanya satu sumber, taruh di tengah.
+    if len(cfg.sumber) == 1:
+        kolom_kartu = [st.columns([1, 2, 1])[1]]
+    else:
+        kolom_kartu = st.columns(len(cfg.sumber))
 
-    c_res_aws, c_res_bpbd = st.columns(2)
-    with c_res_aws:
-        render_accuracy_card("📡 Akurasi AWS Tj. Priok", metrics_aws, "#7c3aed", "AWS")
-    with c_res_bpbd:
-        render_accuracy_card("🌊 Akurasi TMA Psr. Ikan", metrics_bpbd, "#f59e0b", "Pasar Ikan")
+    for kolom, s in zip(kolom_kartu, cfg.sumber):
+        df_obs_hourly = prepare_hourly_data(load_obs(s.file), "waktu", "nilai", selected_month, selected_year)
+        metrik = calc_monthly_metrics(df_pred_hourly, df_obs_hourly)
+        with kolom:
+            render_accuracy_card(s.nama_akurasi, metrik, s.warna_solid, s.nama_data)
 
 
 # =========================================================================
 # 12. FOOTER & UNDUHAN
 # =========================================================================
 
-def render_footer_downloads() -> None:
+def render_footer_downloads(cfg: Stasiun) -> None:
     st.divider()
-    c1, c2, c3 = st.columns(3)
+    cols = st.columns(len(cfg.sumber) + 1)
 
-    with c1:
-        data_aws = open(FILE_HISTORY_AWS, "rb") if os.path.exists(FILE_HISTORY_AWS) else ""
-        st.download_button("📥 AWS CSV", data_aws, "AWS.csv", use_container_width=True)
+    for col, s in zip(cols[:-1], cfg.sumber):
+        with col:
+            ada = os.path.exists(s.file)
+            data = open(s.file, "rb").read() if ada else b""
+            st.download_button(
+                s.label_unduh, data, s.nama_file_unduh,
+                use_container_width=True, disabled=not ada, key=f"dl_{cfg.key}_{s.key}",
+            )
 
-    with c2:
-        data_bpbd = open(FILE_HISTORY_BPBD, "rb") if os.path.exists(FILE_HISTORY_BPBD) else ""
-        st.download_button("📥 Psr. Ikan CSV", data_bpbd, "Pasarikan.csv", use_container_width=True)
-
-    with c3:
+    with cols[-1]:
         if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
@@ -654,37 +811,40 @@ def render_footer_downloads() -> None:
 # =========================================================================
 
 def main() -> None:
-    setup_smart_autorefresh()
+    # set_page_config harus jadi perintah Streamlit pertama
+    cfg_awal = STASIUN[resolve_station_key()]
+    st.set_page_config(page_title=f"Monitoring TMA {cfg_awal.nama_singkat}", layout="wide", page_icon=PAGE_ICON)
 
-    st.set_page_config(page_title=PAGE_TITLE, layout="wide", page_icon=PAGE_ICON)
+    setup_smart_autorefresh()
     inject_custom_css()
 
     sekarang, sekarang_naive = get_current_time_jakarta()
-    tgl_range = render_sidebar(sekarang)
-    render_header()
+    cfg, tgl_range = render_sidebar(sekarang)
+    render_header(cfg)
 
-    df_pred, col_tgl, col_val = load_prediction()
-    live_data = {
-        "aws": get_latest_from_csv(FILE_HISTORY_AWS),
-        "bpbd": get_latest_from_csv(FILE_HISTORY_BPBD),
-    }
+    df_pred, col_tgl, col_val = load_prediction(cfg.file_prediksi)
+    live_data = {s.key: get_latest_from_csv(s.file) for s in cfg.sumber}
 
     if df_pred is None or df_pred.empty:
-        st.error("Gagal memuat data prediksi.")
+        st.error(
+            f"Gagal memuat data prediksi stasiun {cfg.nama_menu}. "
+            f"Pastikan file `{cfg.file_prediksi}` ada di repo, berformat .xlsx, dan punya kolom waktu "
+            f"(`tanggal_prediksi` / `Waktu_WIB` / `Waktu`) serta nilai (`wl_prediksi` / `Tinggi_Navigasi_m`)."
+        )
         return
 
     h_now = df_pred.loc[(df_pred[col_tgl] - sekarang_naive).abs().idxmin(), col_val]
 
-    render_rob_status(h_now, live_data)
+    render_rob_status(cfg, h_now, live_data)
     render_daily_summary_box(df_pred, col_tgl, col_val, sekarang)
-    render_kpi_row(df_pred, col_tgl, col_val, h_now, live_data, sekarang_naive)
+    render_kpi_row(cfg, df_pred, col_tgl, col_val, h_now, live_data, sekarang_naive)
 
-    fig = build_main_chart(df_pred, col_tgl, col_val, tgl_range, sekarang_naive, sekarang)
+    fig = build_main_chart(cfg, df_pred, col_tgl, col_val, tgl_range, sekarang_naive, sekarang)
     if fig is not None:
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-    render_monthly_accuracy_section(df_pred, col_tgl, col_val, sekarang)
-    render_footer_downloads()
+    render_monthly_accuracy_section(cfg, df_pred, col_tgl, col_val, sekarang)
+    render_footer_downloads(cfg)
 
 
 if __name__ == "__main__":
